@@ -1,0 +1,12 @@
+[package]
+name = "vulkan_renderer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = "0.26.0"
+ash = "0.26.0"
+vk-sys = "0.6.0"
+
