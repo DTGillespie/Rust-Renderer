@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 winit = "0.26.0"
-ash = "0.26.0"
+ash = "0.37.3"
 vk-sys = "0.6.0"
 
