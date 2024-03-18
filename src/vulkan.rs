@@ -22,8 +22,12 @@ pub struct VulkanInstance {
   _entry: Entry,
   pub instance: ash::Instance,
   pub physical_device: Option<vk::PhysicalDevice>,
+  pub logical_device: Option<ash::Device>,
   pub surface: Option<SurfaceKHR>,
   surface_loader: Option<Surface>,
+  graphics_queue_family_index: Option<u32>,
+  presentation_queue_family_index: Option<u32>,
+  graphics_queue: Option<vk::Queue>,
 }
 
 impl VulkanInstance {
@@ -35,7 +39,7 @@ impl VulkanInstance {
       Err(_)    => return Err(vk::Result::ERROR_INITIALIZATION_FAILED),
     } };
 
-    println!("Initializing Vulkan instance");
+    println!("Initializing Vulkan Instance");
 
     let app_name_cstr = CString::new(app_name).unwrap();
     let engine_name_cstr = CString::new(engine_name).unwrap();
@@ -58,47 +62,27 @@ impl VulkanInstance {
       _entry: entry, 
       instance,
       physical_device: None,
+      logical_device: None,
       surface: None,
-      surface_loader: None
+      surface_loader: None,
+      graphics_queue_family_index: None,
+      presentation_queue_family_index: None,
+      graphics_queue: None
     })
   }
 
-  pub fn configure_hardware(&mut self) {
-    let device = self.select_physical_device();
-    self.physical_device = match device {
-      Ok(device) => Some(device),
-      Err(_) => {
-        panic!("Failed to identify compatible physical device");
-      }
-    };
+  pub unsafe fn create_surface(&mut self, window: &Window) -> Result<&mut Self, vk::Result> {
 
-    let physical_device = match self.physical_device {
-      Some(device) => device,
-      None => {
-        panic!("Error referencing VulkanInstance.physical_device");
-      }
-    };
-
-    let graphics_queue_family_index = self.identify_required_queue_family_indices(physical_device, &self.instance);
-    match graphics_queue_family_index {
-      Some((index1, index2)) => {
-        println!("Identified duel graphics/presentation queue family indices: {},{}", index1, index2);
-      },
-      None => {panic!("Failed to identify suitable graphics/presentation queue family index")}
+    if (self.surface_loader.is_none()) {
+      self.surface_loader = Some(Surface::new(&self._entry, &self.instance));
     }
-
-  }
-
-  pub unsafe fn create_surface(
-    &mut self,
-    /*event_loop: &EventLoopWindowTarget<()>,*/
-    window: &Window,
-  ) -> Result<SurfaceKHR, vk::Result> {
 
     let raw_window_handle   = window.raw_window_handle();
     let raw_display_handle = window.raw_display_handle();
-    match raw_window_handle {
-      RawWindowHandle::Win32(handle) => {
+
+    /* Win32
+    let surface = match raw_window_handle {
+      RawWindowHandle::Win32(_) => {
         let surface = ash_window::create_surface(
           &self._entry,
           &self.instance,
@@ -109,7 +93,88 @@ impl VulkanInstance {
         Ok(surface)
       },
       _ => Err(vk::Result::ERROR_EXTENSION_NOT_PRESENT),
+    };
+    */
+
+    // Platform Agnostic
+    let surface = ash_window::create_surface(
+      &self._entry,
+      &self.instance,
+      raw_display_handle,
+      raw_window_handle,
+      None
+    )?;
+    
+    self.surface = Some(surface);
+    Ok(self)
+  }
+
+  pub fn configure_hardware(&mut self) -> &mut Self{
+    let device = self.select_physical_device();
+    self.physical_device = match device {
+      Ok(device) => Some(device),
+      Err(_) => {
+        panic!("No compatible device found");
+      }
+    };
+
+    let physical_device = match self.physical_device {
+      Some(device) => device,
+      None => {
+        panic!("Error referencing VulkanInstance field: physical_device");
+      }
+    };
+
+    let properties = unsafe { self.instance.get_physical_device_properties(physical_device) };
+    let features     = unsafe { self.instance.get_physical_device_features(physical_device) };
+
+    println!("\nPhysical Device Properties:\n{}", VulkanInstance::format_device_properties(properties));
+    println!("\nPhysical Device Features:\n{}", VulkanInstance::format_device_features(features));
+
+    self.surface_loader = Some(Surface::new(&self._entry, &self.instance));
+    let queue_indicies = self.identify_required_queue_family_indices(physical_device, &self.instance);
+    match queue_indicies {
+      Some((graphics_queue_index, presentation_queue_index)) => {
+
+        self.graphics_queue_family_index     = Some(graphics_queue_index);
+        self.presentation_queue_family_index = Some(presentation_queue_index);
+
+        println!("Configured Queue indices (Graphics: {}, Presentation: {})", graphics_queue_index, presentation_queue_index);
+        self
+      },
+      None => {panic!("Failed to configure required Vulkan Queues, no indices detected.")}
     }
+  }
+
+  pub fn create_logical_device(&mut self) -> Result<(), vk::Result> {
+    let queue_priorities = [1.0_f32];
+    let queue_family_index = self.graphics_queue_family_index.unwrap();
+
+    let queue_create_info = vk::DeviceQueueCreateInfo::builder()
+      .queue_family_index(queue_family_index)
+      .queue_priorities(&queue_priorities)
+      .build();
+
+    let physical_device_features = vk::PhysicalDeviceFeatures::default();
+
+    let device_create_info = vk::DeviceCreateInfo::builder()
+      .queue_create_infos(&[queue_create_info])
+      .enabled_features(&physical_device_features)
+      .build();
+
+    let logical_device = unsafe {
+      self.instance.create_device(self.physical_device.unwrap(), &device_create_info, None)?
+    };
+
+    self.logical_device = Some(logical_device);
+
+    let graphics_queue = unsafe {
+      self.logical_device.as_ref().unwrap().get_device_queue(queue_family_index, 0)
+    };
+
+    self.graphics_queue = Some(graphics_queue);
+
+    Ok(())
   }
 
   fn select_physical_device(&self) -> Result<vk::PhysicalDevice, vk::Result> {
@@ -156,7 +221,7 @@ impl VulkanInstance {
       let surface_support_result = unsafe {
         self.surface_loader
           .as_ref()
-          .expect("Surface loader not initialized")
+          .expect("VulkanInstance=>surface_loader not initialized")
           .get_physical_device_surface_support(physical_device, index as u32, self.surface.expect("Surface not initialized"))
       };
 
@@ -169,7 +234,6 @@ impl VulkanInstance {
           presentation_index = Some(index as u32);
         }
       } else {
-        println!("Failed to query physical device surface support");
         return None;
       }
 
@@ -200,6 +264,26 @@ impl VulkanInstance {
     extensions.push(ash::extensions::khr::AndroidSurface::name().as_ptr());
   
     extensions
+  }
+
+  fn format_device_properties(properties: vk::PhysicalDeviceProperties) -> String {
+    let device_name = unsafe { std::ffi::CStr::from_ptr(properties.device_name.as_ptr()) }.to_string_lossy().into_owned();
+    let api_version = properties.api_version;
+    let driver_version = properties.driver_version;
+    let vendor_id = properties.vendor_id;
+    let device_id = properties.device_id;
+    let device_type = format!("{:?}", properties.device_type);
+    format!("Device Name: {}\nAPI Version: {}\nDriver Version: {}\nVendor ID: {}\nDevice ID: {} Device Type: {}",
+      device_name, api_version, driver_version, vendor_id, device_id, device_type
+    )
+  }
+
+  fn format_device_features(features: vk::PhysicalDeviceFeatures) -> String {
+    format!(
+      "Geometry Shader: {}\nTesselation Shader: {}\n",
+      features.geometry_shader != 0,
+      features.tessellation_shader != 0
+    )
   }
 
 }

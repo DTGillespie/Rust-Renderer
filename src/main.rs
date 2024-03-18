@@ -9,8 +9,7 @@ use winit::{
 
   fn main() {
 
-    let application_name = "Hello Triangle";
-        
+    let application_name = "Hephaestus";
     let event_loop = EventLoop::new().unwrap();
     let _window = WindowBuilder::new()
       .with_title(application_name)
@@ -19,20 +18,21 @@ use winit::{
     
     let engine_name = "Vulkan Renderer";
     let mut vulkan_instance = VulkanInstance::new(application_name, engine_name)
-      .expect("Failed to initialize Vulkan instance");
+      .expect("Vulkan initialization failed");
     
-    vulkan_instance.configure_hardware();
-
     unsafe {
       vulkan_instance.create_surface(&_window)
-        .expect("Failed to create Vulkan surface");
+        .expect("Vulkan surface creation failed")
+        .configure_hardware()
+        .create_logical_device()
+        .expect("Failed to create logical device");
     }
-    
+
     let _ = event_loop.run(move |event, elwt| {
       let mut _control_flow = ControlFlow::Wait;
 
       match event {
-        Event::WindowEvent { event, window_id } => match event {
+        Event::WindowEvent { event, .. } => match event {
           WindowEvent::CloseRequested => elwt.exit(),
           WindowEvent::Resized(_) => {
             _window.request_redraw();
@@ -42,14 +42,30 @@ use winit::{
           }
           _ => (),
         },
-        Event::NewEvents(_) => todo!(),
-        Event::DeviceEvent { device_id, event } => todo!(),
-        Event::UserEvent(_) => todo!(),
-        Event::Suspended => todo!(),
-        Event::Resumed => todo!(),
-        Event::AboutToWait => todo!(),
-        Event::LoopExiting => todo!(),
-        Event::MemoryWarning => todo!(),
+        Event::NewEvents(_) => {
+
+        },
+        Event::DeviceEvent { device_id, event } => {
+
+        },
+        Event::UserEvent(_) => {
+
+        },
+        Event::Suspended => {
+          
+        },
+        Event::Resumed => {
+
+        },
+        Event::AboutToWait => {
+
+        },
+        Event::LoopExiting => {
+
+        },
+        Event::MemoryWarning => {
+
+        },
       }
     });
   }
