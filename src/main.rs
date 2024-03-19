@@ -9,7 +9,7 @@ use winit::{
 
   fn main() {
 
-    let application_name = "Hephaestus";
+    let application_name = "Real Engine";
     let event_loop = EventLoop::new().unwrap();
     let _window = WindowBuilder::new()
       .with_title(application_name)
@@ -19,13 +19,13 @@ use winit::{
     let engine_name = "Vulkan Renderer";
     let mut vulkan_instance = VulkanInstance::new(application_name, engine_name)
       .expect("Vulkan initialization failed");
-    
     unsafe {
-      vulkan_instance.create_surface(&_window)
+      let _ = vulkan_instance.create_surface(&_window)
         .expect("Vulkan surface creation failed")
         .configure_hardware()
         .create_logical_device()
-        .expect("Failed to create logical device");
+        .expect("Failed to create logical device")
+        .create_swapchain(&_window);
     }
 
     let _ = event_loop.run(move |event, elwt| {

@@ -1,5 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
+use ash::extensions::khr::Swapchain;
+use ash::vk::SwapchainKHR;
 use ash::{
   vk, 
   vk::QueueFlags, 
@@ -28,6 +30,8 @@ pub struct VulkanInstance {
   graphics_queue_family_index: Option<u32>,
   presentation_queue_family_index: Option<u32>,
   graphics_queue: Option<vk::Queue>,
+  swapchain_loader: Option<Swapchain>,
+  swapchain: Option<SwapchainKHR>,
 }
 
 impl VulkanInstance {
@@ -67,7 +71,9 @@ impl VulkanInstance {
       surface_loader: None,
       graphics_queue_family_index: None,
       presentation_queue_family_index: None,
-      graphics_queue: None
+      graphics_queue: None,
+      swapchain_loader: None,
+      swapchain: None,
     })
   }
 
@@ -146,7 +152,7 @@ impl VulkanInstance {
     }
   }
 
-  pub fn create_logical_device(&mut self) -> Result<(), vk::Result> {
+  pub fn create_logical_device(&mut self) -> Result<&mut Self, vk::Result> {
     let queue_priorities = [1.0_f32];
     let queue_family_index = self.graphics_queue_family_index.unwrap();
 
@@ -174,7 +180,114 @@ impl VulkanInstance {
 
     self.graphics_queue = Some(graphics_queue);
 
-    Ok(())
+    Ok(self)
+  }
+
+  pub fn create_swapchain(&mut self, window: &Window) -> Result<&mut Self, vk::Result> {
+    let surface_capabilities = self.query_surface_capabilities()?;
+    let surface_format = self.configure_surface_format()?;
+    let presentation_mode = self.configure_presentation_mode()?;
+    let swap_extent = self.configure_swap_extent(&surface_capabilities, window);
+
+    let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
+      .surface(self.surface.unwrap())
+      .min_image_count(surface_capabilities.min_image_count + 1)
+      .image_format(surface_format.format)
+      .image_color_space(surface_format.color_space)
+      .image_extent(swap_extent)
+      .image_array_layers(1)
+      .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+      .pre_transform(surface_capabilities.current_transform)
+      .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+      .present_mode(presentation_mode)
+      .clipped(true);
+
+    let swapchain_loader = Swapchain::new(&self.instance, self.logical_device.as_ref().unwrap());
+    let swapchain = unsafe { 
+      swapchain_loader.create_swapchain(&swapchain_create_info, None)
+    };
+
+    self.swapchain = Some(swapchain.expect("Swapchain creation failed"));
+    self.swapchain_loader = Some(swapchain_loader);
+
+    Ok(self)
+  }
+
+  fn query_surface_capabilities(&self) -> Result<vk::SurfaceCapabilitiesKHR, vk::Result> {
+    let physical_device = self.physical_device.expect("Physical device not initialized");
+    let surface = self.surface.expect("Surface not initialzied");
+    let surface_loader = self.surface_loader.as_ref().expect("Surface Loader not initialized");
+
+    let surface_capabilities = unsafe {
+      surface_loader.get_physical_device_surface_capabilities(physical_device, surface)?
+    };
+
+    Ok(surface_capabilities)
+  }
+
+  fn configure_surface_format(&self) -> Result<vk::SurfaceFormatKHR, vk::Result> {
+    let physical_device = self.physical_device.expect("Physical device not initialized");
+    let surface = self.surface.expect("Surface not initialzied");
+    let surface_loader = self.surface_loader.as_ref().expect("Surface Loader not initialized");
+
+    let formats = unsafe {
+      surface_loader.get_physical_device_surface_formats(physical_device, surface)?
+    };
+
+    if formats.len() == 1 && formats[0].format == vk::Format::UNDEFINED {
+      return Ok(vk::SurfaceFormatKHR {
+        format: vk::Format::B8G8R8A8_SRGB,
+        color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+      });
+    }
+
+    for format in &formats {
+      if format.format == vk::Format::B8G8R8A8_SRGB && format.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR {
+        return Ok(*format);
+      }
+    }
+
+    formats.get(0).cloned().ok_or(vk::Result::ERROR_FORMAT_NOT_SUPPORTED)
+  }
+
+  fn configure_presentation_mode(&self) -> Result<vk::PresentModeKHR, vk::Result> {
+    let physical_device = self.physical_device.expect("Physical device not initialized");
+    let surface = self.surface.expect("Surface not initialzied");
+    let surface_loader = self.surface_loader.as_ref().expect("Surface Loader not initialized");
+
+    let present_modes = unsafe {
+      surface_loader.get_physical_device_surface_present_modes(physical_device, surface)?
+    };
+
+    let mut optimal_mode = vk::PresentModeKHR::FIFO;
+
+    for &mode in present_modes.iter() {
+      if mode == vk::PresentModeKHR::MAILBOX {
+        return Ok(mode);
+      } else if mode == vk::PresentModeKHR::IMMEDIATE {
+        optimal_mode = vk::PresentModeKHR::IMMEDIATE;
+      }
+    }
+
+    Ok(optimal_mode)
+  }
+
+  fn configure_swap_extent(&self, surface_capabilities: &vk::SurfaceCapabilitiesKHR, window: &winit::window::Window) -> vk::Extent2D {
+    if surface_capabilities.current_extent.width != u32::MAX {
+      surface_capabilities.current_extent
+    } else {
+      let window_size = window.inner_size();
+      vk::Extent2D {
+        width: window_size.width.clamp(
+          surface_capabilities.min_image_extent.width, 
+          surface_capabilities.max_image_extent.width
+        ),
+        height: window_size.height.clamp(
+          surface_capabilities.min_image_extent.height,
+          surface_capabilities.max_image_extent.height,
+        )
+      }
+    }
   }
 
   fn select_physical_device(&self) -> Result<vk::PhysicalDevice, vk::Result> {
@@ -251,8 +364,8 @@ impl VulkanInstance {
   fn get_required_extensions() -> Vec<*const c_char> {
     let mut extensions: Vec<*const c_char> = vec![];
 
-    // Always required: VK_KHR_surface
     extensions.push(ash::extensions::khr::Surface::name().as_ptr());
+    extensions.push(ash::extensions::khr::Swapchain::name().as_ptr());
 
     #[cfg(target_os = "windows")]
     extensions.push(ash::extensions::khr::Win32Surface::name().as_ptr());
@@ -268,10 +381,10 @@ impl VulkanInstance {
 
   fn format_device_properties(properties: vk::PhysicalDeviceProperties) -> String {
     let device_name = unsafe { std::ffi::CStr::from_ptr(properties.device_name.as_ptr()) }.to_string_lossy().into_owned();
-    let api_version = properties.api_version;
+    let api_version    = properties.api_version;
     let driver_version = properties.driver_version;
-    let vendor_id = properties.vendor_id;
-    let device_id = properties.device_id;
+    let vendor_id      = properties.vendor_id;
+    let device_id      = properties.device_id;
     let device_type = format!("{:?}", properties.device_type);
     format!("Device Name: {}\nAPI Version: {}\nDriver Version: {}\nVendor ID: {}\nDevice ID: {} Device Type: {}",
       device_name, api_version, driver_version, vendor_id, device_id, device_type
