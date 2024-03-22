@@ -364,14 +364,16 @@ impl VulkanInstance {
   fn get_required_extensions() -> Vec<*const c_char> {
     let mut extensions: Vec<*const c_char> = vec![];
 
-    extensions.push(ash::extensions::khr::Surface::name().as_ptr());
+    //extensions.push(ash::extensions::khr::Surface::name().as_ptr());
     extensions.push(ash::extensions::khr::Swapchain::name().as_ptr());
 
     #[cfg(target_os = "windows")]
     extensions.push(ash::extensions::khr::Win32Surface::name().as_ptr());
     
+    /*
     #[cfg(target_os = "linux")]
     extensions.push(ash::extensions::khr::XlibSurface::name().as_ptr());
+    */
 
     #[cfg(target_os = "android")]
     extensions.push(ash::extensions::khr::AndroidSurface::name().as_ptr());
@@ -394,7 +396,7 @@ impl VulkanInstance {
   fn format_device_features(features: vk::PhysicalDeviceFeatures) -> String {
     format!(
       "Geometry Shader: {}\nTesselation Shader: {}\n",
-      features.geometry_shader != 0,
+      features.geometry_shader != 0,  
       features.tessellation_shader != 0
     )
   }
