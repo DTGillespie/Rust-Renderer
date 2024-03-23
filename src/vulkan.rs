@@ -55,10 +55,10 @@ impl VulkanInstance {
       .engine_version(vk::make_api_version(0, 0, 0, 0))
       .api_version(vk::API_VERSION_1_0);
 
-    let extension_names = VulkanInstance::get_required_extensions();
+    let instance_extensions = VulkanInstance::load_instance_extensions();
     let create_info = vk::InstanceCreateInfo::builder()
       .application_info(&app_info)
-      .enabled_extension_names(&extension_names);
+      .enabled_extension_names(&instance_extensions);
 
     let instance = unsafe { entry.create_instance(&create_info, None)? };
 
@@ -86,23 +86,6 @@ impl VulkanInstance {
     let raw_window_handle   = window.raw_window_handle();
     let raw_display_handle = window.raw_display_handle();
 
-    /* Win32
-    let surface = match raw_window_handle {
-      RawWindowHandle::Win32(_) => {
-        let surface = ash_window::create_surface(
-          &self._entry,
-          &self.instance,
-          raw_display_handle,
-          raw_window_handle,
-          None
-        ).expect("Failed to create Vulkan surface");
-        Ok(surface)
-      },
-      _ => Err(vk::Result::ERROR_EXTENSION_NOT_PRESENT),
-    };
-    */
-
-    // Platform Agnostic
     let surface = ash_window::create_surface(
       &self._entry,
       &self.instance,
@@ -115,7 +98,8 @@ impl VulkanInstance {
     Ok(self)
   }
 
-  pub fn configure_hardware(&mut self) -> &mut Self{
+  pub fn configure_hardware(&mut self) -> &mut Self {
+  
     let device = self.select_physical_device();
     self.physical_device = match device {
       Ok(device) => Some(device),
@@ -134,8 +118,8 @@ impl VulkanInstance {
     let properties = unsafe { self.instance.get_physical_device_properties(physical_device) };
     let features     = unsafe { self.instance.get_physical_device_features(physical_device) };
 
-    println!("\nPhysical Device Properties:\n{}", VulkanInstance::format_device_properties(properties));
-    println!("\nPhysical Device Features:\n{}", VulkanInstance::format_device_features(features));
+    println!("\nDevice Properties:\n{}", VulkanInstance::format_device_properties(properties));
+    println!("\nDevice Features:\n{}", VulkanInstance::format_device_features(features));
 
     self.surface_loader = Some(Surface::new(&self._entry, &self.instance));
     let queue_indicies = self.identify_required_queue_family_indices(physical_device, &self.instance);
@@ -161,11 +145,17 @@ impl VulkanInstance {
       .queue_priorities(&queue_priorities)
       .build();
 
+    let device_extension_names = [
+      ash::extensions::khr::Swapchain::name().as_ptr(),
+      //ash::extensions::khr::Surface::name().as_ptr()
+    ];
+
     let physical_device_features = vk::PhysicalDeviceFeatures::default();
 
     let device_create_info = vk::DeviceCreateInfo::builder()
       .queue_create_infos(&[queue_create_info])
       .enabled_features(&physical_device_features)
+      .enabled_extension_names(&device_extension_names)
       .build();
 
     let logical_device = unsafe {
@@ -310,8 +300,7 @@ impl VulkanInstance {
     let properties = unsafe { instance.get_physical_device_properties(device) };
     let features = unsafe { instance.get_physical_device_features(device) };
 
-    features.geometry_shader != 0 && 
-      properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU
+    features.geometry_shader != 0 
   }
 
   fn identify_required_queue_family_indices(&self, physical_device: vk::PhysicalDevice, instance: &ash::Instance) -> Option<(u32, u32)> {
@@ -334,7 +323,7 @@ impl VulkanInstance {
       let surface_support_result = unsafe {
         self.surface_loader
           .as_ref()
-          .expect("VulkanInstance=>surface_loader not initialized")
+          .expect("VulkanInstance Surface Loader not initialized")
           .get_physical_device_surface_support(physical_device, index as u32, self.surface.expect("Surface not initialized"))
       };
 
@@ -361,19 +350,18 @@ impl VulkanInstance {
     }
   }
 
-  fn get_required_extensions() -> Vec<*const c_char> {
+  fn load_instance_extensions() -> Vec<*const c_char> {
     let mut extensions: Vec<*const c_char> = vec![];
 
-    //extensions.push(ash::extensions::khr::Surface::name().as_ptr());
-    extensions.push(ash::extensions::khr::Swapchain::name().as_ptr());
+    extensions.push(ash::extensions::khr::Surface::name().as_ptr());
 
     #[cfg(target_os = "windows")]
     extensions.push(ash::extensions::khr::Win32Surface::name().as_ptr());
     
-    /*
     #[cfg(target_os = "linux")]
     extensions.push(ash::extensions::khr::XlibSurface::name().as_ptr());
-    */
+    extensions.push(ash::extensions::khr::XcbSurface::name().as_ptr());
+    extensions.push(ash::extensions::khr::WaylandSurface::name().as_ptr());
 
     #[cfg(target_os = "android")]
     extensions.push(ash::extensions::khr::AndroidSurface::name().as_ptr());
@@ -388,7 +376,7 @@ impl VulkanInstance {
     let vendor_id      = properties.vendor_id;
     let device_id      = properties.device_id;
     let device_type = format!("{:?}", properties.device_type);
-    format!("Device Name: {}\nAPI Version: {}\nDriver Version: {}\nVendor ID: {}\nDevice ID: {} Device Type: {}",
+    format!("Name: {}\nAPI Version: {}\nDriver Version: {}\nVendor ID: {}\nDevice ID: {}\nType: {}",
       device_name, api_version, driver_version, vendor_id, device_id, device_type
     )
   }
