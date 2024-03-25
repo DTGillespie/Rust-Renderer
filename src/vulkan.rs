@@ -11,14 +11,11 @@ use ash::{
   extensions::khr::Surface, 
 };
 use winit::{
-  event_loop::EventLoopWindowTarget,
   window::Window,
 };
 use raw_window_handle::{
   HasRawWindowHandle, 
-  RawWindowHandle,
   HasRawDisplayHandle,
-  RawDisplayHandle,
 };
 
 pub struct VulkanInstance {
@@ -270,7 +267,6 @@ impl VulkanInstance {
     let physical_device = self.physical_device.expect("Physical device not initialized");
     let surface = self.surface.expect("Surface not initialzied");
     let surface_loader = self.surface_loader.as_ref().expect("Surface Loader not initialized");
-
     let surface_capabilities = unsafe {
       surface_loader.get_physical_device_surface_capabilities(physical_device, surface)?
     };
@@ -283,7 +279,6 @@ impl VulkanInstance {
     let physical_device = self.physical_device.expect("Physical device not initialized");
     let surface = self.surface.expect("Surface not initialzied");
     let surface_loader = self.surface_loader.as_ref().expect("Surface Loader not initialized");
-
     let formats = unsafe {
       surface_loader.get_physical_device_surface_formats(physical_device, surface)?
     };
@@ -310,7 +305,6 @@ impl VulkanInstance {
     let physical_device = self.physical_device.expect("Physical device not initialized");
     let surface = self.surface.expect("Surface not initialzied");
     let surface_loader = self.surface_loader.as_ref().expect("Surface Loader not initialized");
-
     let present_modes = unsafe {
       surface_loader.get_physical_device_surface_present_modes(physical_device, surface)?
     };
