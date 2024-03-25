@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
-use ash::vk::{Extent2D, PresentModeKHR, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR};
+use ash::vk::{Extent2D, PresentModeKHR, RenderPass, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR};
 use ash::{
   vk, 
   vk::QueueFlags, 
@@ -36,7 +36,8 @@ pub struct VulkanInstance {
   swapchain_loader                : Option<Swapchain>,
   swapchain                       : Option<SwapchainKHR>,
   swapchain_images                : Option<Vec<vk::Image>>,
-  swapchain_image_views           : Option<Vec<vk::ImageView>>
+  swapchain_image_views           : Option<Vec<vk::ImageView>>,
+  render_pass                     : Option<RenderPass>
 }
 
 impl VulkanInstance {
@@ -85,7 +86,8 @@ impl VulkanInstance {
       swapchain_loader                : None,
       swapchain                       : None,
       swapchain_images                : None,
-      swapchain_image_views           : None
+      swapchain_image_views           : None,
+      render_pass                     : None,
     })
   }
 
@@ -263,6 +265,69 @@ impl VulkanInstance {
     Ok(views)
   }
 
+  pub fn create_render_pass(&mut self) -> Result<&mut Self, vk::Result> {
+    let color_attachment = vk::AttachmentDescription::builder()
+      .format(self.swapchain_image_format.expect("Swapchain Image Format not set"))
+      .samples(vk::SampleCountFlags::TYPE_1)
+      .load_op(vk::AttachmentLoadOp::CLEAR)
+      .store_op(vk::AttachmentStoreOp::STORE)
+      .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+      .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+      .initial_layout(vk::ImageLayout::UNDEFINED)
+      .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+      .build();
+
+    let depth_attachment = vk::AttachmentDescription::builder()
+      .format(vk::Format::D32_SFLOAT)
+      .samples(vk::SampleCountFlags::TYPE_1)
+      .load_op(vk::AttachmentLoadOp::CLEAR)
+      .store_op(vk::AttachmentStoreOp::DONT_CARE)
+      .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+      .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+      .initial_layout(vk::ImageLayout::UNDEFINED)
+      .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+      .build();
+
+    let color_attachment_ref = vk::AttachmentReference::builder()
+      .attachment(0)
+      .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+      .build();
+
+    let depth_attachment_ref = vk::AttachmentReference::builder()
+      .attachment(1)
+      .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+      .build();
+
+    let attachments = [color_attachment, depth_attachment];
+
+    let subpass = vk::SubpassDescription::builder()
+      .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+      .color_attachments(std::slice::from_ref(&color_attachment_ref))
+      .depth_stencil_attachment(&depth_attachment_ref)
+      .build();
+
+    let dependency = vk::SubpassDependency::builder()
+      .src_subpass(vk::SUBPASS_EXTERNAL)
+      .dst_subpass(0)
+      .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+      .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+      .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+      .build();
+
+    let render_pass_info = vk::RenderPassCreateInfo::builder()
+      .attachments(&attachments)
+      .subpasses(std::slice::from_ref(&subpass))
+      .dependencies(std::slice::from_ref(&dependency))
+      .build();
+
+    let render_pass = unsafe {
+      self.logical_device.as_ref().unwrap().create_render_pass(&render_pass_info, None)?
+    };
+
+    self.render_pass = Some(render_pass);
+    Ok(self)
+  }
+
   fn query_surface_capabilities(&mut self) -> Result<&mut Self, vk::Result> {
     let physical_device = self.physical_device.expect("Physical device not initialized");
     let surface = self.surface.expect("Surface not initialzied");
@@ -363,7 +428,6 @@ impl VulkanInstance {
   fn check_device_compatibility(device: vk::PhysicalDevice, instance: &ash::Instance) -> bool {
     let properties = unsafe { instance.get_physical_device_properties(device) };
     let features = unsafe { instance.get_physical_device_features(device) };
-
     features.geometry_shader != 0 
   }
 

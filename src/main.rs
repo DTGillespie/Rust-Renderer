@@ -20,12 +20,11 @@ use winit::{
     let mut vulkan_instance = VulkanInstance::new(application_name, engine_name)
       .expect("Vulkan initialization failed");
     unsafe {
-      let _ = vulkan_instance.create_surface(&_window)
-        .expect("Vulkan surface creation failed")
+      let _ = vulkan_instance.create_surface(&_window).expect("Vulkan surface creation failed")
         .configure_hardware()
-        .create_logical_device()
-        .expect("Failed to create logical device")
-        .create_swapchain(&_window);
+        .create_logical_device().expect("Failed to create logical device")
+        .create_swapchain(&_window).unwrap()
+        .create_render_pass();
     }
 
     let _ = event_loop.run(move |event, elwt| {
@@ -43,7 +42,7 @@ use winit::{
           _ => (),
         },
         Event::NewEvents(_) => {
-          
+
         },
         Event::DeviceEvent { device_id, event } => {
 
