@@ -26,6 +26,8 @@ use winit::{
         .create_logical_device().expect("Failed to create logical device")
         .create_swapchain(&_window).unwrap()
         .create_render_pass();
+
+      let resource_manager = vk_resources::VkResourceManager::new(&vulkan_instance.logical_device.unwrap(), 10);
     }
 
     let _ = event_loop.run(move |event, elwt| {

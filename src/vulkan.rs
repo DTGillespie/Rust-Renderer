@@ -17,6 +17,8 @@ use raw_window_handle::{
   HasRawWindowHandle, 
   HasRawDisplayHandle,
 };
+
+use crate::vk_resources::VkResourceManager;
 pub struct VulkanInstance {
   _entry: Entry,
   pub instance                    : ash::Instance,
@@ -36,7 +38,8 @@ pub struct VulkanInstance {
   swapchain                       : Option<SwapchainKHR>,
   swapchain_images                : Option<Vec<vk::Image>>,
   swapchain_image_views           : Option<Vec<vk::ImageView>>,
-  render_pass                     : Option<RenderPass>
+  render_pass                     : Option<RenderPass>,
+  resource_manager                : Option<VkResourceManager>,
 }
 
 impl VulkanInstance {
@@ -87,6 +90,7 @@ impl VulkanInstance {
       swapchain_images                : None,
       swapchain_image_views           : None,
       render_pass                     : None,
+      resource_manager                : None,
     })
   }
 
