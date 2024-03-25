@@ -6,6 +6,7 @@ use winit::{
   };
   
   mod vulkan;
+  mod vk_resources;
 
   fn main() {
 

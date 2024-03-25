@@ -17,15 +17,14 @@ use raw_window_handle::{
   HasRawWindowHandle, 
   HasRawDisplayHandle,
 };
-
 pub struct VulkanInstance {
   _entry: Entry,
   pub instance                    : ash::Instance,
   pub physical_device             : Option<vk::PhysicalDevice>,
   pub logical_device              : Option<ash::Device>,
   pub surface                     : Option<SurfaceKHR>,
-  surface_capabilities            : Option<SurfaceCapabilitiesKHR>,
   surface_format                  : Option<SurfaceFormatKHR>,
+  surface_capabilities            : Option<SurfaceCapabilitiesKHR>,
   presentation_mode               : Option<PresentModeKHR>,
   swap_extent                     : Option<Extent2D>,
   swapchain_image_format          : Option<vk::Format>,
