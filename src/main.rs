@@ -7,6 +7,7 @@ use winit::{
   
   mod vulkan;
   mod vk_resources;
+  mod pipeline;
 
   fn main() {
 
@@ -27,7 +28,8 @@ use winit::{
         .create_swapchain(&_window).unwrap()
         .create_render_pass();
 
-      let resource_manager = vk_resources::VkResourceManager::new(&vulkan_instance.logical_device.unwrap(), 10);
+      let resource_manager = vk_resources::VkResourceManager::new(vulkan_instance.logical_device.as_ref().unwrap(), 10);
+      vulkan_instance.bind_resource_manager(resource_manager);
     }
 
     let _ = event_loop.run(move |event, elwt| {

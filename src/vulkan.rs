@@ -331,6 +331,13 @@ impl VulkanInstance {
     Ok(self)
   }
 
+  pub fn bind_resource_manager(&mut self, resource_manager: VkResourceManager) {
+    match self.resource_manager {
+      None => self.resource_manager = Some(resource_manager),
+      Some(_) => panic!("VkResourceManager already bound to VulkanInstance")
+    }
+  }
+
   fn query_surface_capabilities(&mut self) -> Result<&mut Self, vk::Result> {
     let physical_device = self.physical_device.expect("Physical device not initialized");
     let surface = self.surface.expect("Surface not initialzied");
