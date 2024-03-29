@@ -1,13 +1,12 @@
 use crate::pipeline::PipelineConfig;
 use crate::vulkan_resources::{Vertex, VulkanResources};
 use std::ffi::CString;
-use std::mem::size_of;
 use std::os::raw::c_char;
 use winit::window::Window;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
 use ash::vk::{
-  Buffer, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, PhysicalDeviceMemoryProperties, PipelineLayout, PresentModeKHR, RenderPass, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR
+  Buffer, ClearColorValue, ClearValue, CommandBuffer, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandBufferLevel, CommandBufferUsageFlags, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, Fence, Framebuffer, FramebufferCreateInfo, Offset2D, PhysicalDeviceMemoryProperties, PipelineBindPoint, PipelineLayout, PresentModeKHR, Rect2D, RenderPass, RenderPassBeginInfo, Semaphore, SemaphoreCreateInfo, SubpassContents, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR
 };
 use ash::{
   vk, 
@@ -39,9 +38,17 @@ pub struct VulkanInstance {
   swapchain_loader                : Option<Swapchain>,
   swapchain                       : Option<SwapchainKHR>,
   swapchain_images                : Option<Vec<vk::Image>>,
+  swapchain_framebuffers          : Option<Vec<Framebuffer>>,
   swapchain_image_views           : Option<Vec<vk::ImageView>>,
   render_pass                     : Option<RenderPass>,
-  resource_manager                : Option<VulkanResources>,
+  vulkan_resources                : Option<VulkanResources>,
+  vertex_count                    : usize,                // Need to move to vulkan_resources
+  vertex_buffer                   : Option<Buffer>,       // Need to move to vulkan_resources
+  vertex_buffer_memory            : Option<DeviceMemory>, // Need to move to vulkan_resources
+  command_pool                    : Option<CommandPool>,
+  command_buffers                 : Option<Vec<CommandBuffer>>,
+  image_available_semaphore       : Option<Semaphore>,
+  render_finished_semaphore       : Option<Semaphore>,
 }
 
 impl VulkanInstance {
@@ -90,9 +97,17 @@ impl VulkanInstance {
       swapchain_loader                : None,
       swapchain                       : None,
       swapchain_images                : None,
+      swapchain_framebuffers          : None,
       swapchain_image_views           : None,
       render_pass                     : None,
-      resource_manager                : None,
+      vulkan_resources                : None,
+      vertex_buffer                   : None,
+      vertex_buffer_memory            : None,
+      command_pool                    : None,
+      command_buffers                 : None,
+      image_available_semaphore       : None,
+      render_finished_semaphore       : None,
+      vertex_count                    : 0
     })
   }
 
@@ -269,6 +284,27 @@ impl VulkanInstance {
     }).collect::<Result<Vec<_>, _>>()?;
     Ok(views)
   }
+
+  pub fn create_framebuffers(&mut self) -> &mut Self {
+
+    self.swapchain_framebuffers = Some(self.swapchain_image_views.iter().filter_map(|image_view| {
+
+        //let attachments = [image_view];
+        let framebuffer_info = vk::FramebufferCreateInfo::builder()
+            .render_pass(self.render_pass.unwrap()) 
+            .attachments(&image_view)
+            .width(self.swap_extent.unwrap().width)
+            .height(self.swap_extent.unwrap().height)
+            .layers(1)
+            .build();
+
+        unsafe {
+            self.logical_device.as_ref().unwrap().create_framebuffer(&framebuffer_info, None)
+                .ok()
+        }
+    }).collect::<Vec<_>>());
+    self
+}
 
   pub fn create_render_pass(&mut self) -> Result<&mut Self, vk::Result> {
     let color_attachment = vk::AttachmentDescription::builder()
@@ -520,18 +556,64 @@ impl VulkanInstance {
   }
 
   pub fn allocate_resources(&mut self, max_sets: u32) -> &mut Self {
-    match self.resource_manager {
+    match self.vulkan_resources {
       None => {
         let resource_manager = VulkanResources::new(self.logical_device.as_ref().unwrap(), max_sets);
-        self.resource_manager = Some(resource_manager);
+        self.vulkan_resources = Some(resource_manager);
       },
       Some(_) => panic!("VkResourceManager already bound to VulkanInstance")
     }
     self
   }
 
+  pub fn create_command_pool(&mut self) -> &mut Self {
+
+    let pool_create_info = CommandPoolCreateInfo::builder()
+      .queue_family_index(self.graphics_queue_family_index.unwrap())
+      .flags(CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+      .build();
+
+    self.command_pool = Some(unsafe {
+        self.logical_device.as_ref().unwrap().create_command_pool(&pool_create_info, None)
+          .expect("Failed to create Command Pool")
+      }
+    );
+    self
+  }
+
+  pub fn create_semaphores(&mut self) {
+    let semaphore_info = SemaphoreCreateInfo::default();
+
+    self.image_available_semaphore = unsafe {
+      Some(self.logical_device.as_ref().unwrap().create_semaphore(&semaphore_info, None)
+        .expect("Failed to create Image Availability Semaphore"))
+    };
+
+    self.render_finished_semaphore = unsafe {
+      Some(self.logical_device.as_ref().unwrap().create_semaphore(&semaphore_info, None)
+      .expect("Failed to create Render Fiished Semaphore"))
+    }
+  }
+
+  pub fn allocate_command_buffers(&mut self) -> &mut Self {
+    
+    let command_buffer_count = self.swapchain_images.as_ref().unwrap().len();
+    let allocate_info = CommandBufferAllocateInfo::builder()
+      .command_pool(self.command_pool.unwrap())
+      .level(CommandBufferLevel::PRIMARY)
+      .command_buffer_count(command_buffer_count as u32)
+      .build();
+
+    self.command_buffers = unsafe {
+      Some(self.logical_device.as_ref().unwrap().allocate_command_buffers(&allocate_info)
+        .expect("Failed to allocate Command Buffer"))
+    };
+
+    self
+  }
+
   pub fn define_shader(&mut self, shader_id: &str, bindings: Vec<DescriptorSetLayoutBinding>) -> &mut Self {
-    self.resource_manager
+    self.vulkan_resources
       .as_mut()
       .unwrap()
       .create_shader_resources(shader_id)
@@ -541,14 +623,14 @@ impl VulkanInstance {
   }
   
   pub fn create_pipeline_layout(&mut self, shader_id: &str) -> PipelineLayout {
-    self.resource_manager
+    self.vulkan_resources
       .as_mut()
       .unwrap()
       .create_pipeline_layout(self.logical_device.as_ref().unwrap(), shader_id)
   }
 
   pub fn configure_graphics_pipeline(&mut self, pipeline_id: &str, pipeline_layout: vk::PipelineLayout, pipeline_config: PipelineConfig) {
-    self.resource_manager
+    self.vulkan_resources
       .as_mut()
       .unwrap()
       .create_graphics_pipeline(
@@ -561,8 +643,87 @@ impl VulkanInstance {
       );
   }
 
-  pub fn allocate_vertex_buffer(&mut self, vertices: &[Vertex]) -> (Buffer, DeviceMemory) {
-    self.resource_manager.as_mut().unwrap().allocate_vertex_buffer(vertices, &self.instance, self.physical_device.unwrap(), &self.logical_device.as_mut().unwrap())
+  pub fn allocate_vertex_buffer(&mut self, vertices: &[Vertex]) {
+    let vbo = self.vulkan_resources.as_mut().unwrap().allocate_vertex_buffer(vertices, &self.instance, self.physical_device.unwrap(), &self.logical_device.as_mut().unwrap());
+    self.vertex_count = vertices.len();
+    self.vertex_buffer        = Some(vbo.0);
+    self.vertex_buffer_memory = Some(vbo.1);
   }
 
+  pub fn acquire_next_image_index(&self) -> Result<u32, vk::Result> {
+    let timeout = u64::MAX;
+
+    let (image_index, _is_suboptimal) = unsafe {
+      self.swapchain_loader.as_ref().unwrap().acquire_next_image(
+        self.swapchain.unwrap(), 
+        timeout, 
+        self.image_available_semaphore.unwrap(), 
+        Fence::null()
+      )?
+    };
+
+    Ok(image_index)
+  }
+
+  pub fn record_command_buffer(&mut self, pipeline_id: &str, image_index: usize) {
+    
+    let command_buffer = self.command_buffers.as_ref().unwrap()[image_index];
+    let begin_info = CommandBufferBeginInfo::builder()
+      .flags(CommandBufferUsageFlags::SIMULTANEOUS_USE)
+      .build();
+
+    unsafe {
+      self.logical_device.as_ref().unwrap().begin_command_buffer(command_buffer, &begin_info)
+        .expect("Failed to begin recording command buffer");
+
+      // Begin Render Pass
+      let render_pass_begin_info = RenderPassBeginInfo::builder()
+        .render_pass(self.render_pass.unwrap())
+        .framebuffer(self.swapchain_framebuffers.as_ref().unwrap()[image_index])
+        .render_area(Rect2D {
+          offset: Offset2D { x: 0, y: 0 },
+          extent: self.swap_extent.unwrap()
+        })
+        .clear_values(&[ClearValue {
+          color: ClearColorValue {
+            float32: [1.0, 0.0, 0.0, 1.0], // Clear Value
+          },
+        }])
+        .build();
+
+      self.logical_device.as_ref().unwrap().cmd_begin_render_pass(
+        command_buffer, 
+        &render_pass_begin_info,
+        SubpassContents::INLINE
+      );
+
+      // Bind Pipeline
+      self.logical_device.as_ref().unwrap().cmd_bind_pipeline(
+        command_buffer, 
+        PipelineBindPoint::GRAPHICS, 
+        self.vulkan_resources.as_mut().unwrap().get_graphics_pipeline(pipeline_id)
+      );
+
+      let vertex_buffers = [self.vertex_buffer.unwrap()];
+      let offsets = [0];
+      unsafe {
+        self.logical_device.as_ref().unwrap().cmd_bind_vertex_buffers(
+          command_buffer, 
+          0, 
+          &vertex_buffers, 
+          &offsets
+        );
+
+        println!("Debug draw");
+        /* Draw */
+        self.logical_device.as_ref().unwrap().cmd_draw(
+          command_buffer, 
+          self.vertex_count as u32, 
+          2, 
+          0, 
+          0
+        )
+      }
+    }
+  }
 }

@@ -40,10 +40,13 @@ use winit::{
         .create_logical_device().expect("Failed to create Logical Device")
         .create_swapchain(&_window).unwrap()
         .create_render_pass().expect("Failed to create Render Pass")
-        .allocate_resources(10);
-        
-      // Test Shader
+        .create_framebuffers()
+        .allocate_resources(10)
+        .create_command_pool()
+        .allocate_command_buffers()
+        .create_semaphores();
 
+      // Test Shader
       let cwd = env::current_dir().expect("Failed to get current working directory");
       let shaders_dir = cwd.join("..").join("..").join("src").join("shaders");
 
@@ -83,7 +86,7 @@ use winit::{
       
       vulkan_instance.define_shader("Demo", bindings); // Defines Descriptor Layouts and allocate Sets
       let pipeline_layout = vulkan_instance.create_pipeline_layout("Demo");
-      vulkan_instance.configure_graphics_pipeline("Primary", pipeline_layout, pipeline_config);
+      vulkan_instance.configure_graphics_pipeline("PRIMARY", pipeline_layout, pipeline_config);
 
       let vertices: Vec<Vertex> = vec![
         Vertex { position: [-0.5, -0.5, 0.0], color: [1.0, 0.0, 0.0] },
@@ -91,7 +94,7 @@ use winit::{
         Vertex { position: [0.0, 0.5, 0.0],   color: [0.0, 0.0, 1.0] },
       ];
 
-      let vbo = vulkan_instance.allocate_vertex_buffer(&vertices);
+      vulkan_instance.allocate_vertex_buffer(&vertices);
     }
 
     let _ = event_loop.run(move |event, elwt| {
@@ -99,36 +102,57 @@ use winit::{
 
       match event {
         Event::WindowEvent { event, .. } => match event {
+          
           WindowEvent::CloseRequested => elwt.exit(),
+          
           WindowEvent::Resized(_) => {
             _window.request_redraw();
           },
+
           WindowEvent::RedrawRequested => {
-            // Vulkan Drawing Implementation
+            match vulkan_instance.acquire_next_image_index() {
+
+              Ok(image_index) => {
+                vulkan_instance.record_command_buffer("PRIMARY", image_index as usize);
+              },
+
+              Err(e) => {
+                eprintln!("Failed to acquire next image index: {:?}", e);
+                panic!("Fatal error, closing application");
+              }
+            }
           }
           _ => (),
         },
+
         Event::NewEvents(_) => {
 
         },
+
         Event::DeviceEvent { device_id, event } => {
 
         },
+        
         Event::UserEvent(_) => {
 
         },
+        
         Event::Suspended => {
           
         },
+        
         Event::Resumed => {
 
         },
+        
         Event::AboutToWait => {
 
         },
+        
         Event::LoopExiting => {
 
         },
+        
         Event::MemoryWarning => {
 
         },

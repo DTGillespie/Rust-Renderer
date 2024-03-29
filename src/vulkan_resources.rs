@@ -8,7 +8,7 @@ use std::{
 };
 use ash::{
   util::Align, vk::{
-    self, Buffer, BufferCreateInfo, BufferUsageFlags, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, DeviceMemory, DeviceSize, Extent2D, Format, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceMemoryProperties, PipelineLayout, PipelineLayoutCreateInfo, ShaderStageFlags, SharingMode, VertexInputAttributeDescription, VertexInputBindingDescription, VertexInputRate
+    self, Buffer, BufferCreateInfo, BufferUsageFlags, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, DeviceMemory, DeviceSize, Extent2D, Format, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceMemoryProperties, Pipeline, PipelineLayout, PipelineLayoutCreateInfo, ShaderStageFlags, SharingMode, VertexInputAttributeDescription, VertexInputBindingDescription, VertexInputRate
   }, Device, Instance
 };
 
@@ -222,5 +222,9 @@ impl VulkanResources {
       }
     }
     panic!("Failed to query suitable memory type");
+  }
+
+  pub fn get_graphics_pipeline(&mut self, pipeline_id: &str) -> Pipeline {
+    self.pipelines.get(pipeline_id).unwrap().pipeline
   }
 }
