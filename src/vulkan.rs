@@ -1,3 +1,4 @@
+use crate::pipeline::PipelineConfig;
 use crate::vk_resources::VkResourceManager;
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -329,41 +330,6 @@ impl VulkanInstance {
     Ok(self)
   }
 
-  pub fn bind_resources(&mut self, max_sets: u32) -> &mut Self {
-    match self.resource_manager {
-      None => {
-        let resource_manager = VkResourceManager::new(self.logical_device.as_ref().unwrap(), max_sets);
-        self.resource_manager = Some(resource_manager);
-      },
-      Some(_) => panic!("VkResourceManager already bound to VulkanInstance")
-    }
-    self
-  }
-
-  pub fn define_shader(&mut self, shader_id: &str, bindings: Vec<DescriptorSetLayoutBinding>) -> &mut Self {
-    self.resource_manager
-      .as_mut()
-      .unwrap()
-      .create_shader_resources(shader_id)
-      .new_descriptor_layout(self.logical_device.as_ref().unwrap(), shader_id, bindings)
-      .allocate_shader_descriptor_sets(self.logical_device.as_ref().unwrap(), shader_id);
-    self
-  }
-  
-  pub fn create_pipeline_layout(&mut self, shader_id: &str) -> PipelineLayout {
-    self.resource_manager
-      .as_mut()
-      .unwrap()
-      .create_pipeline_layout(self.logical_device.as_ref().unwrap(), shader_id)
-  }
-
-  pub fn bind_graphics_pipeline(&mut self, pipeline_layout: vk::PipelineLayout) {
-    self.resource_manager
-      .as_mut()
-      .unwrap()
-      .create_graphics_pipeline(self.logical_device.as_ref().unwrap(),self.render_pass.unwrap(), pipeline_layout);
-  }
-
   fn query_surface_capabilities(&mut self) -> Result<&mut Self, vk::Result> {
     let physical_device = self.physical_device.expect("Physical device not initialized");
     let surface = self.surface.expect("Surface not initialzied");
@@ -548,6 +514,41 @@ impl VulkanInstance {
       features.geometry_shader != 0,  
       features.tessellation_shader != 0
     )
+  }
+
+  pub fn allocate_resources(&mut self, max_sets: u32) -> &mut Self {
+    match self.resource_manager {
+      None => {
+        let resource_manager = VkResourceManager::new(self.logical_device.as_ref().unwrap(), max_sets);
+        self.resource_manager = Some(resource_manager);
+      },
+      Some(_) => panic!("VkResourceManager already bound to VulkanInstance")
+    }
+    self
+  }
+
+  pub fn define_shader(&mut self, shader_id: &str, bindings: Vec<DescriptorSetLayoutBinding>) -> &mut Self {
+    self.resource_manager
+      .as_mut()
+      .unwrap()
+      .create_shader_resources(shader_id)
+      .new_descriptor_layout(self.logical_device.as_ref().unwrap(), shader_id, bindings)
+      .allocate_shader_descriptor_sets(self.logical_device.as_ref().unwrap(), shader_id);
+    self
+  }
+  
+  pub fn create_pipeline_layout(&mut self, shader_id: &str) -> PipelineLayout {
+    self.resource_manager
+      .as_mut()
+      .unwrap()
+      .create_pipeline_layout(self.logical_device.as_ref().unwrap(), shader_id)
+  }
+
+  pub fn configure_graphics_pipeline(&mut self, pipeline_id: &str, pipeline_layout: vk::PipelineLayout, pipeline_config: PipelineConfig) {
+    self.resource_manager
+      .as_mut()
+      .unwrap()
+      .create_graphics_pipeline(self.logical_device.as_ref().unwrap(),self.render_pass.unwrap(), pipeline_id, pipeline_layout, pipeline_config);
   }
 
 }

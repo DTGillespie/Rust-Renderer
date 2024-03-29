@@ -24,7 +24,7 @@ impl ShaderStage {
   fn new(device: &Device, config: &ShaderStageConfig) -> Self {
     let shader_code      = GraphicsPipeline::load_shader(&config.shader_path);
     let module      = GraphicsPipeline::create_shader_module(device, &shader_code);
-    let entry_point_name = CString::new(config.entry_point).unwrap();
+    let entry_point_name = CString::new(config.entry_point.as_str()).unwrap();
     ShaderStage {
       stage: config.stage,
       module,
@@ -36,7 +36,7 @@ impl ShaderStage {
 pub struct GraphicsPipeline {
   pub pipeline            : Pipeline,
   pub pipeline_layout     : PipelineLayout,
-  shader_stages: Vec<ShaderStage>
+  shader_stages           : Vec<ShaderStage> // Not Used??
 }
 
 impl GraphicsPipeline {
@@ -64,7 +64,8 @@ impl GraphicsPipeline {
   }
 
   pub fn load_shader(path: &str) -> Vec<u8> {
-    let mut file = std::fs::File::open(path).expect("Failure opening file");
+    let msg = format!("Failure loading shader from source: {}", path);
+    let mut file = std::fs::File::open(path).expect(&msg);
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failure reading file");
     buffer

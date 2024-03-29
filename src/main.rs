@@ -33,19 +33,25 @@ use winit::{
         .create_logical_device().expect("Failed to create Logical Device")
         .create_swapchain(&_window).unwrap()
         .create_render_pass().expect("Failed to create Render Pass")
-        .bind_resources(10);
+        .allocate_resources(10);
         
       // Test Shader
+      let cwd = env::current_dir().expect("Failed to get current working directory");
+      let shaders_dir = cwd.join("..").join("..").join("src").join("shaders");
+
+      let vertex_shader_path   = shaders_dir.join("vertex.spv".to_string()).to_str().unwrap().to_string();
+      let fragment_shader_path = shaders_dir.join("fragment.spv".to_string()).to_str().unwrap().to_string();
+      
       let pipeline_config = PipelineConfig {
         shader_stages: vec![
           ShaderStageConfig {
             stage: ShaderStageFlags::VERTEX,
-            shader_path: "shaders/vertex.spv".to_string(),
+            shader_path: vertex_shader_path,
             entry_point: "main".to_string()
           },
           ShaderStageConfig {
             stage: ShaderStageFlags::FRAGMENT,
-            shader_path: "shaders/fragment.spv".to_string(),
+            shader_path: fragment_shader_path,
             entry_point: "main".to_string()
           }
         ]
@@ -68,9 +74,8 @@ use winit::{
 
       
       vulkan_instance.define_shader("Demo", bindings); // Defines Descriptor Layouts and allocate Sets
-      
       let pipeline_layout = vulkan_instance.create_pipeline_layout("Demo");
-      vulkan_instance.bind_graphics_pipeline(pipeline_layout);
+      vulkan_instance.configure_graphics_pipeline("Primary", pipeline_layout, pipeline_config);
     }
 
     let _ = event_loop.run(move |event, elwt| {

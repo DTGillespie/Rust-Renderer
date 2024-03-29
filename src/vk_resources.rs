@@ -1,4 +1,4 @@
-use crate::pipeline::{self, GraphicsPipeline};
+use crate::pipeline::{self, GraphicsPipeline, PipelineConfig};
 use std::collections::HashMap;
 use ash::{
   vk::{self, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout, PipelineLayoutCreateInfo, ShaderStageFlags},
@@ -20,9 +20,9 @@ impl ShaderResources {
 }
 
 pub struct VkResourceManager {
-  shader_resources : HashMap<String, ShaderResources>,
   descriptor_pool  : DescriptorPool,
-  pipelines        : Vec<GraphicsPipeline>
+  shader_resources : HashMap<String, ShaderResources>,
+  pipelines        : HashMap<String, GraphicsPipeline>
 }
 
 impl VkResourceManager {
@@ -45,7 +45,7 @@ impl VkResourceManager {
 
     VkResourceManager {
       shader_resources : HashMap::new(),
-      pipelines        : Vec::new(),
+      pipelines        : HashMap::new(),
       descriptor_pool,
     }
   }
@@ -115,11 +115,8 @@ impl VkResourceManager {
     }
   }
 
-  pub fn create_graphics_pipeline(&mut self, device: &Device, render_pass: vk::RenderPass, pipeline_layout: vk::PipelineLayout) {
-    /*
-    let pipeline = GraphicsPipeline::new(device, render_pass, pipeline_layout);
-    self.pipelines.push(pipeline);
-    self.pipelines.len() - 1
-    */
+  pub fn create_graphics_pipeline(&mut self, device: &Device, render_pass: vk::RenderPass, pipeline_id: &str, pipeline_layout: vk::PipelineLayout, pipeline_config: PipelineConfig) {
+    let pipeline = GraphicsPipeline::new(device, render_pass, pipeline_layout, pipeline_config);
+    self.pipelines.insert(pipeline_id.to_string(), pipeline);
   }
 }
