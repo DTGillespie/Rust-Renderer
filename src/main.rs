@@ -1,9 +1,15 @@
 use std::env;
-use ash::vk::{DescriptorSetLayoutBinding, DescriptorType, ShaderStageFlags};
-use pipeline::{
-  GraphicsPipeline, PipelineConfig, ShaderStageConfig
-};
+
 use vulkan::VulkanInstance;
+use ash::vk::{
+  DescriptorSetLayoutBinding, 
+  DescriptorType, 
+  ShaderStageFlags, 
+};
+use pipeline::{
+  PipelineConfig, 
+  ShaderStageConfig,
+};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -36,6 +42,7 @@ use winit::{
         .allocate_resources(10);
         
       // Test Shader
+
       let cwd = env::current_dir().expect("Failed to get current working directory");
       let shaders_dir = cwd.join("..").join("..").join("src").join("shaders");
 

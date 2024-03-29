@@ -5,7 +5,16 @@ use std::os::raw::c_char;
 use winit::window::Window;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
-use ash::vk::{DescriptorSetLayoutBinding, Extent2D, PipelineLayout, PresentModeKHR, RenderPass, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR};
+use ash::vk::{
+  DescriptorSetLayoutBinding, 
+  Extent2D, 
+  PipelineLayout, 
+  PresentModeKHR, 
+  RenderPass, 
+  SurfaceCapabilitiesKHR, 
+  SurfaceFormatKHR, 
+  SwapchainKHR
+};
 use ash::{
   vk, 
   vk::QueueFlags, 
@@ -548,7 +557,14 @@ impl VulkanInstance {
     self.resource_manager
       .as_mut()
       .unwrap()
-      .create_graphics_pipeline(self.logical_device.as_ref().unwrap(),self.render_pass.unwrap(), pipeline_id, pipeline_layout, pipeline_config);
+      .create_graphics_pipeline(
+        self.logical_device.as_ref().unwrap(),
+        self.render_pass.unwrap(), 
+        pipeline_id,
+        pipeline_layout, 
+        pipeline_config,
+        self.swap_extent.unwrap(),
+      );
   }
 
 }

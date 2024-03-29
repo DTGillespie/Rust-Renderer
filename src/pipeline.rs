@@ -1,8 +1,44 @@
+use std::{ffi::CString, io::Read, mem::{offset_of, size_of},};
 use ash::{
-  vk::{self, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo, ShaderModule, ShaderStageFlags},
+  vk::{
+    self, ColorComponentFlags, CullModeFlags, Extent2D, Format, FrontFace, GraphicsPipelineCreateInfo, Offset2D, Pipeline, PipelineCache, PipelineColorBlendAttachmentState, PipelineColorBlendAttachmentStateBuilder, PipelineColorBlendStateCreateInfo, PipelineInputAssemblyStateCreateInfo, PipelineLayout, PipelineMultisampleStateCreateInfo, PipelineRasterizationStateCreateInfo, PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo, PipelineViewportStateCreateInfo, PolygonMode, PrimitiveTopology, Rect2D, SampleCountFlags, ShaderModule, ShaderStageFlags, VertexInputAttributeDescription, VertexInputBindingDescription, VertexInputRate, Viewport
+  },
   Device
 };
-use std::{ffi::CString, io::Read, path::Path};
+
+#[repr(C)]
+pub struct Vertex {
+  pub position : [f32; 3],
+  pub color    : [f32; 3]
+}
+
+impl Vertex {
+
+  fn binding_description() -> VertexInputBindingDescription {
+    VertexInputBindingDescription::builder()
+      .binding(0)
+      .stride(size_of::<Vertex>() as u32)
+      .input_rate(VertexInputRate::VERTEX)
+      .build()
+  }
+
+  fn attribute_descriptions() -> [VertexInputAttributeDescription; 2] {
+    let position_attribute = VertexInputAttributeDescription::builder()
+      .binding(0)
+      .location(0)
+      .format(Format::R32G32B32_SFLOAT)
+      .offset(offset_of!(Vertex, position) as u32)
+      .build();
+
+    let color_attribute = VertexInputAttributeDescription::builder()
+      .binding(0)
+      .location(1)
+      .format(Format::R32G32B32_SFLOAT)
+      .offset(offset_of!(Vertex, color) as u32)
+      .build();
+    [position_attribute, color_attribute]
+  }
+}
 
 pub struct ShaderStageConfig {
   pub stage       : ShaderStageFlags,
@@ -36,11 +72,17 @@ impl ShaderStage {
 pub struct GraphicsPipeline {
   pub pipeline            : Pipeline,
   pub pipeline_layout     : PipelineLayout,
-  shader_stages           : Vec<ShaderStage> // Not Used??
+  shader_stages           : Vec<ShaderStage>
 }
 
 impl GraphicsPipeline {
-  pub fn new(device: &Device, render_pass: vk::RenderPass, pipeline_layout: vk::PipelineLayout, pipeline_config: PipelineConfig) -> Self {
+  pub fn new(
+    device: &Device, 
+    render_pass     : vk::RenderPass, 
+    pipeline_layout : vk::PipelineLayout, 
+    pipeline_config : PipelineConfig,
+    extent          : Extent2D
+  ) -> Self {
     
     let shader_stages: Vec<ShaderStage> = pipeline_config
       .shader_stages
@@ -48,14 +90,87 @@ impl GraphicsPipeline {
       .map(|config| ShaderStage::new(device, config))
       .collect();
     
-    let pipeline_shader_stages: Vec<PipelineShaderStageCreateInfo> = shader_stages.iter().map(|stage| {
-      PipelineShaderStageCreateInfo::builder()
-        .stage(stage.stage)
-        .module(stage.module)
-        .name(stage.entry_point_name.as_c_str())
-        .build()
-    }).collect();
+    let input_assembly = PipelineInputAssemblyStateCreateInfo::builder()
+      .topology(PrimitiveTopology::TRIANGLE_LIST)
+      .primitive_restart_enable(false)
+      .build();
 
+    let viewport = Viewport {
+      x: 0.0,
+      y: 0.0,
+      width    : extent.width as f32,
+      height   : extent.height as f32,
+      min_depth : 0.0,
+      max_depth : 1.0
+    };
+
+    let scissor = Rect2D {
+      offset: Offset2D {x: 0, y: 0},
+      extent
+    };
+
+    let rasterizer = PipelineRasterizationStateCreateInfo::builder()
+      .depth_clamp_enable(false)
+      .rasterizer_discard_enable(false) // Disables output to framebuffer
+      .polygon_mode(PolygonMode::FILL)  // Solid: FILL, Wireframe: LINE
+      .line_width(1.0)                  // Wireframe Line Width
+      .cull_mode(CullModeFlags::BACK)   // Backface culling (NONE, BACK, FRONT, FRONT_AND_BACK)
+      .front_face(FrontFace::CLOCKWISE) // (CLOCKWISE, COUNTER_CLOCKWISE)
+      .build();
+
+    let multisampling = PipelineMultisampleStateCreateInfo::builder()
+      .sample_shading_enable(false)
+      .rasterization_samples(SampleCountFlags::TYPE_1) // No Multisampling
+      .build();
+
+    let color_blend_attachment = PipelineColorBlendAttachmentState::builder()
+      .color_write_mask(ColorComponentFlags::R | ColorComponentFlags::G | ColorComponentFlags::B | ColorComponentFlags::A)
+      .blend_enable(false)
+      .build();
+
+    let color_blending = PipelineColorBlendStateCreateInfo::builder()
+      .logic_op_enable(false)
+      .attachments(&[color_blend_attachment])
+      .build();
+
+      let pipeline_shader_stages: Vec<PipelineShaderStageCreateInfo> = shader_stages.iter().map(|stage| {
+        PipelineShaderStageCreateInfo::builder()
+          .stage(stage.stage)
+          .module(stage.module)
+          .name(stage.entry_point_name.as_c_str())
+          .build()
+      }).collect();
+
+      let vertex_binding_description = Vertex::binding_description();
+      let vertex_attribute_descriptions = Vertex::attribute_descriptions();
+      let vertex_input_info = PipelineVertexInputStateCreateInfo::builder()
+        .vertex_binding_descriptions(&[vertex_binding_description])
+        .vertex_attribute_descriptions(&vertex_attribute_descriptions)
+        .build();
+  
+      let viewport_state = PipelineViewportStateCreateInfo::builder()
+        .viewports(&[viewport])
+        .scissors(&[scissor])
+        .build();
+
+      let pipeline_info = GraphicsPipelineCreateInfo::builder()
+        .stages(&pipeline_shader_stages)
+        .vertex_input_state(&vertex_input_info)
+        .input_assembly_state(&input_assembly)
+        .viewport_state(&viewport_state)
+        .rasterization_state(&rasterizer)
+        .multisample_state(&multisampling)
+        .color_blend_state(&color_blending)
+        .layout(pipeline_layout)
+        .render_pass(render_pass)
+        .subpass(0)
+        .build();
+
+      let graphics_pipeline = unsafe {
+        device.create_graphics_pipelines(PipelineCache::null(), &[pipeline_info], None)
+          .expect("Failed to create Graphics Pipeline")[0]
+      };
+      
     Self {
       pipeline: vk::Pipeline::null(),
       pipeline_layout,
