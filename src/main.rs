@@ -1,5 +1,6 @@
 use std::env;
 
+use vulkan_resources::Vertex;
 use vulkan::VulkanInstance;
 use ash::vk::{
   DescriptorSetLayoutBinding, 
@@ -17,7 +18,7 @@ use winit::{
   };
   
   mod vulkan;
-  mod vk_resources;
+  mod vulkan_resources;
   mod pipeline;
 
   fn main() {
@@ -83,6 +84,14 @@ use winit::{
       vulkan_instance.define_shader("Demo", bindings); // Defines Descriptor Layouts and allocate Sets
       let pipeline_layout = vulkan_instance.create_pipeline_layout("Demo");
       vulkan_instance.configure_graphics_pipeline("Primary", pipeline_layout, pipeline_config);
+
+      let vertices: Vec<Vertex> = vec![
+        Vertex { position: [-0.5, -0.5, 0.0], color: [1.0, 0.0, 0.0] },
+        Vertex { position: [0.5, -0.5, 0.0],  color: [0.0, 1.0, 0.0] },
+        Vertex { position: [0.0, 0.5, 0.0],   color: [0.0, 0.0, 1.0] },
+      ];
+
+      let vbo = vulkan_instance.allocate_vertex_buffer(&vertices);
     }
 
     let _ = event_loop.run(move |event, elwt| {

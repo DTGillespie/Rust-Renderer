@@ -1,19 +1,13 @@
 use crate::pipeline::PipelineConfig;
-use crate::vk_resources::VkResourceManager;
+use crate::vulkan_resources::{Vertex, VulkanResources};
 use std::ffi::CString;
+use std::mem::size_of;
 use std::os::raw::c_char;
 use winit::window::Window;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
 use ash::vk::{
-  DescriptorSetLayoutBinding, 
-  Extent2D, 
-  PipelineLayout, 
-  PresentModeKHR, 
-  RenderPass, 
-  SurfaceCapabilitiesKHR, 
-  SurfaceFormatKHR, 
-  SwapchainKHR
+  Buffer, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, PhysicalDeviceMemoryProperties, PipelineLayout, PresentModeKHR, RenderPass, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR
 };
 use ash::{
   vk, 
@@ -47,7 +41,7 @@ pub struct VulkanInstance {
   swapchain_images                : Option<Vec<vk::Image>>,
   swapchain_image_views           : Option<Vec<vk::ImageView>>,
   render_pass                     : Option<RenderPass>,
-  resource_manager                : Option<VkResourceManager>,
+  resource_manager                : Option<VulkanResources>,
 }
 
 impl VulkanInstance {
@@ -528,7 +522,7 @@ impl VulkanInstance {
   pub fn allocate_resources(&mut self, max_sets: u32) -> &mut Self {
     match self.resource_manager {
       None => {
-        let resource_manager = VkResourceManager::new(self.logical_device.as_ref().unwrap(), max_sets);
+        let resource_manager = VulkanResources::new(self.logical_device.as_ref().unwrap(), max_sets);
         self.resource_manager = Some(resource_manager);
       },
       Some(_) => panic!("VkResourceManager already bound to VulkanInstance")
@@ -565,6 +559,10 @@ impl VulkanInstance {
         pipeline_config,
         self.swap_extent.unwrap(),
       );
+  }
+
+  pub fn allocate_vertex_buffer(&mut self, vertices: &[Vertex]) -> (Buffer, DeviceMemory) {
+    self.resource_manager.as_mut().unwrap().allocate_vertex_buffer(vertices, &self.instance, self.physical_device.unwrap(), &self.logical_device.as_mut().unwrap())
   }
 
 }

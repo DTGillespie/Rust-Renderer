@@ -1,44 +1,12 @@
-use std::{ffi::CString, io::Read, mem::{offset_of, size_of},};
+use std::{ffi::CString, io::Read,};
 use ash::{
   vk::{
-    self, ColorComponentFlags, CullModeFlags, Extent2D, Format, FrontFace, GraphicsPipelineCreateInfo, Offset2D, Pipeline, PipelineCache, PipelineColorBlendAttachmentState, PipelineColorBlendAttachmentStateBuilder, PipelineColorBlendStateCreateInfo, PipelineInputAssemblyStateCreateInfo, PipelineLayout, PipelineMultisampleStateCreateInfo, PipelineRasterizationStateCreateInfo, PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo, PipelineViewportStateCreateInfo, PolygonMode, PrimitiveTopology, Rect2D, SampleCountFlags, ShaderModule, ShaderStageFlags, VertexInputAttributeDescription, VertexInputBindingDescription, VertexInputRate, Viewport
+    self, ColorComponentFlags, CullModeFlags, Extent2D, FrontFace, GraphicsPipelineCreateInfo, Offset2D, Pipeline, PipelineCache, PipelineColorBlendAttachmentState, PipelineColorBlendAttachmentStateBuilder, PipelineColorBlendStateCreateInfo, PipelineInputAssemblyStateCreateInfo, PipelineLayout, PipelineMultisampleStateCreateInfo, PipelineRasterizationStateCreateInfo, PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo, PipelineViewportStateCreateInfo, PolygonMode, PrimitiveTopology, Rect2D, SampleCountFlags, ShaderModule, ShaderStageFlags, VertexInputAttributeDescription, VertexInputBindingDescription, VertexInputRate, Viewport
   },
   Device
 };
 
-#[repr(C)]
-pub struct Vertex {
-  pub position : [f32; 3],
-  pub color    : [f32; 3]
-}
-
-impl Vertex {
-
-  fn binding_description() -> VertexInputBindingDescription {
-    VertexInputBindingDescription::builder()
-      .binding(0)
-      .stride(size_of::<Vertex>() as u32)
-      .input_rate(VertexInputRate::VERTEX)
-      .build()
-  }
-
-  fn attribute_descriptions() -> [VertexInputAttributeDescription; 2] {
-    let position_attribute = VertexInputAttributeDescription::builder()
-      .binding(0)
-      .location(0)
-      .format(Format::R32G32B32_SFLOAT)
-      .offset(offset_of!(Vertex, position) as u32)
-      .build();
-
-    let color_attribute = VertexInputAttributeDescription::builder()
-      .binding(0)
-      .location(1)
-      .format(Format::R32G32B32_SFLOAT)
-      .offset(offset_of!(Vertex, color) as u32)
-      .build();
-    [position_attribute, color_attribute]
-  }
-}
+use crate::vulkan_resources::Vertex;
 
 pub struct ShaderStageConfig {
   pub stage       : ShaderStageFlags,
