@@ -1,109 +1,125 @@
+use crate::pipeline::{self, GraphicsPipeline};
+use std::collections::HashMap;
 use ash::{
-  vk,
+  vk::{self, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, PipelineLayout, PipelineLayoutCreateInfo, ShaderStageFlags},
   Device,
-  vk::DescriptorSetLayout,
-  vk::DescriptorSetLayoutBinding,
-  vk::DescriptorSetLayoutCreateInfo,
-  vk::DescriptorPoolCreateInfo,
-  vk::DescriptorSet,
-  vk::DescriptorType,
-  vk::DescriptorPool,
-  vk::DescriptorPoolSize,
-  vk::ShaderStageFlags,
-  vk::DescriptorSetAllocateInfo,
 };
 
+pub struct ShaderResources {
+  descriptor_layouts : Vec<DescriptorSetLayout>,
+  descriptor_sets    : Vec<DescriptorSet>,
+}
+
+impl ShaderResources {
+  fn new() -> Self {
+    ShaderResources {
+      descriptor_layouts : Vec::new(),
+      descriptor_sets    : Vec::new(),
+    }
+  }
+}
+
 pub struct VkResourceManager {
-  pub descriptor_layouts : VkrDescriptorLayouts,
-  pub descriptor_pool    : VkrDescriptorPool,
-  pub descriptor_sets    : VkrDescriptorSets,
+  shader_resources : HashMap<String, ShaderResources>,
+  descriptor_pool  : DescriptorPool,
+  pipelines        : Vec<GraphicsPipeline>
 }
 
 impl VkResourceManager {
   pub fn new(device: &ash::Device, max_sets: u32) -> Self {
-    let descriptor_layouts = VkrDescriptorLayouts::new(device);
+
     let pool_sizes = [DescriptorPoolSize {
       ty: DescriptorType::UNIFORM_BUFFER,
       descriptor_count: max_sets,
     }];
 
-    let descriptor_pool = VkrDescriptorPool::new(device, max_sets, &pool_sizes);
-    let descriptor_sets = VkrDescriptorSets::new(device, &descriptor_pool, &descriptor_layouts, max_sets as usize);
-  
-    VkResourceManager {
-      descriptor_layouts,
-      descriptor_pool,
-      descriptor_sets,
-    }
-  }
-}
-
-pub struct VkrDescriptorLayouts {
-  pub layouts: Vec<DescriptorSetLayout>
-}
-
-impl VkrDescriptorLayouts {
-  pub fn new(device: &Device) -> Self {
-    let ubo_layout_binding = DescriptorSetLayoutBinding::builder()
-      .binding(0) // Shader Index Binding
-      .descriptor_type(DescriptorType::UNIFORM_BUFFER)
-      .descriptor_count(1)
-      .stage_flags(ShaderStageFlags::VERTEX)
-      .build();
-
-    let layout_bindings = [ubo_layout_binding];
-    let layout_info = DescriptorSetLayoutCreateInfo::builder()
-      .bindings(&layout_bindings)
-      .build();
-    
-    let layout = unsafe {
-      device.create_descriptor_set_layout(&layout_info, None)
-        .expect("Failed to create Descriptor Set Layout")
-    };
-
-    VkrDescriptorLayouts {
-      layouts: vec![layout],
-    }
-  }
-}
-
-pub struct VkrDescriptorPool {
-  pub pool: DescriptorPool
-}
-
-impl VkrDescriptorPool {
-  pub fn new(device: &ash::Device, max_sets: u32, pool_sizes: &[DescriptorPoolSize]) -> Self {
     let pool_info = DescriptorPoolCreateInfo::builder()
-      .pool_sizes(pool_sizes)
+      .pool_sizes(&pool_sizes)
       .max_sets(max_sets)
       .build();
 
-    let pool = unsafe {
+    let descriptor_pool = unsafe {
       device.create_descriptor_pool(&pool_info, None)
         .expect("Failed to create Descriptor Pool")
     };
 
-    VkrDescriptorPool{ pool }
+    VkResourceManager {
+      shader_resources : HashMap::new(),
+      pipelines        : Vec::new(),
+      descriptor_pool,
+    }
   }
-}
 
-pub struct VkrDescriptorSets {
-  pub sets: Vec<DescriptorSet>
-}
+  pub fn create_shader_resources(&mut self, shader_id: &str) -> &mut Self {
+    self.shader_resources.insert(shader_id.to_string(), ShaderResources::new());
+    self
+  }
 
-impl VkrDescriptorSets {
-  pub fn new(device: &ash::Device, pool: &VkrDescriptorPool, layouts: &VkrDescriptorLayouts, num_sets: usize) -> Self {
-    let layouts_ref: Vec<DescriptorSetLayout> = layouts.layouts.iter().copied().collect();
-    let allocate_info = DescriptorSetAllocateInfo::builder()
-      .descriptor_pool(pool.pool)
-      .set_layouts(&layouts_ref)
+  pub fn new_descriptor_layout(&mut self, device: &Device, shader_id: &str, bindings: Vec<DescriptorSetLayoutBinding>) -> &mut Self {
+
+    let layout_info = DescriptorSetLayoutCreateInfo::builder()
+      .bindings(&bindings)
       .build();
 
-    let sets = unsafe {
-      device.allocate_descriptor_sets(&allocate_info)
-        .expect("Failed to allocate Descriptor Sets")
+    let descriptor_layout = unsafe {
+      device.create_descriptor_set_layout(&layout_info, None)
+        .expect("Failed to create Descriptor Set Layout")
     };
 
-    VkrDescriptorSets { sets }
+    if let Some(shader_resources) = self.shader_resources.get_mut(shader_id) {
+      shader_resources.descriptor_layouts.push(descriptor_layout);
+    } else {
+      println!("Shader ID not found. Ensure shader resources have been allocated before attempting to add a layout");
+    }
+
+    self
+  }
+
+  pub fn allocate_shader_descriptor_sets(&mut self, device: &Device, shader_id: &str) {
+
+    if let Some(shader_resources) = self.shader_resources.get(shader_id) {
+      let layouts: Vec<DescriptorSetLayout> = shader_resources.descriptor_layouts.iter().copied().collect();
+      let allocate_info = DescriptorSetAllocateInfo::builder()
+        .descriptor_pool(self.descriptor_pool)
+        .set_layouts(&layouts)
+        .build();
+
+      let sets = unsafe {
+        device.allocate_descriptor_sets(&allocate_info)
+          .expect("Failed to allocate Descriptor Sets")
+      };
+
+      if let Some(shader_resources) = self.shader_resources.get_mut(shader_id) {
+        shader_resources.descriptor_sets = sets;
+      }
+    } else {
+      println!("Shader ID not found. Ensure shader resources have been allocated before attempting to add a layout");
+    }
+  }
+
+  pub fn create_pipeline_layout(&mut self, device: &Device, shader_id: &str) -> PipelineLayout {
+    if let Some(shader_resources) = self.shader_resources.get(shader_id) {
+      let layouts: Vec<DescriptorSetLayout> = shader_resources.descriptor_layouts.iter().copied().collect();
+      let pipeline_layout_info = PipelineLayoutCreateInfo::builder()
+        .set_layouts(&layouts)
+        .build();
+
+      let pipeline_layout = unsafe {
+        device.create_pipeline_layout(&pipeline_layout_info, None)
+          .expect("Failed to create Pipeline Layout")
+      };
+
+      pipeline_layout
+    } else {
+      panic!("Shader ID not found. Ensure shader resources have been allocated before attemtping to create Pipeline Layout");
+    }
+  }
+
+  pub fn create_graphics_pipeline(&mut self, device: &Device, render_pass: vk::RenderPass, pipeline_layout: vk::PipelineLayout) {
+    /*
+    let pipeline = GraphicsPipeline::new(device, render_pass, pipeline_layout);
+    self.pipelines.push(pipeline);
+    self.pipelines.len() - 1
+    */
   }
 }

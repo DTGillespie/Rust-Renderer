@@ -1,30 +1,28 @@
+use crate::vk_resources::VkResourceManager;
 use std::ffi::CString;
 use std::os::raw::c_char;
+use winit::window::Window;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
-use ash::vk::{Extent2D, PresentModeKHR, RenderPass, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR};
+use ash::vk::{DescriptorSetLayoutBinding, Extent2D, PipelineLayout, PresentModeKHR, RenderPass, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR};
 use ash::{
   vk, 
   vk::QueueFlags, 
   vk::SurfaceKHR,
   Entry, 
-  extensions::khr::Surface, 
-};
-use winit::{
-  window::Window,
+  extensions::khr::Surface,
 };
 use raw_window_handle::{
   HasRawWindowHandle, 
   HasRawDisplayHandle,
 };
 
-use crate::vk_resources::VkResourceManager;
 pub struct VulkanInstance {
   _entry: Entry,
-  pub instance                    : ash::Instance,
-  pub physical_device             : Option<vk::PhysicalDevice>,
-  pub logical_device              : Option<ash::Device>,
-  pub surface                     : Option<SurfaceKHR>,
+  instance                        : ash::Instance,
+  physical_device                 : Option<vk::PhysicalDevice>,
+  logical_device                  : Option<ash::Device>,
+  surface                         : Option<SurfaceKHR>,
   surface_format                  : Option<SurfaceFormatKHR>,
   surface_capabilities            : Option<SurfaceCapabilitiesKHR>,
   presentation_mode               : Option<PresentModeKHR>,
@@ -331,11 +329,39 @@ impl VulkanInstance {
     Ok(self)
   }
 
-  pub fn bind_resource_manager(&mut self, resource_manager: VkResourceManager) {
+  pub fn bind_resources(&mut self, max_sets: u32) -> &mut Self {
     match self.resource_manager {
-      None => self.resource_manager = Some(resource_manager),
+      None => {
+        let resource_manager = VkResourceManager::new(self.logical_device.as_ref().unwrap(), max_sets);
+        self.resource_manager = Some(resource_manager);
+      },
       Some(_) => panic!("VkResourceManager already bound to VulkanInstance")
     }
+    self
+  }
+
+  pub fn define_shader(&mut self, shader_id: &str, bindings: Vec<DescriptorSetLayoutBinding>) -> &mut Self {
+    self.resource_manager
+      .as_mut()
+      .unwrap()
+      .create_shader_resources(shader_id)
+      .new_descriptor_layout(self.logical_device.as_ref().unwrap(), shader_id, bindings)
+      .allocate_shader_descriptor_sets(self.logical_device.as_ref().unwrap(), shader_id);
+    self
+  }
+  
+  pub fn create_pipeline_layout(&mut self, shader_id: &str) -> PipelineLayout {
+    self.resource_manager
+      .as_mut()
+      .unwrap()
+      .create_pipeline_layout(self.logical_device.as_ref().unwrap(), shader_id)
+  }
+
+  pub fn bind_graphics_pipeline(&mut self, pipeline_layout: vk::PipelineLayout) {
+    self.resource_manager
+      .as_mut()
+      .unwrap()
+      .create_graphics_pipeline(self.logical_device.as_ref().unwrap(),self.render_pass.unwrap(), pipeline_layout);
   }
 
   fn query_surface_capabilities(&mut self) -> Result<&mut Self, vk::Result> {
