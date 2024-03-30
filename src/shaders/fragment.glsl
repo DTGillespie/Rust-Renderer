@@ -1,9 +1,6 @@
-#version 450
-
-layout(location = 0) in vec3 fragColor;
-
-layout(location = 0) out vec4 outColor;
+#version 330 core
+out vec4 FragColor;
 
 void main() {
-  outColor == vec4(fragColor, 1.0);
+    FragColor = vec4(1.0, 0.5, 0.2, 1.0); // orange color
 }
