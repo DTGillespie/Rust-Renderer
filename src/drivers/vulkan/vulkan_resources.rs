@@ -1,16 +1,11 @@
-use crate::pipeline::{
-  GraphicsPipeline, 
-  PipelineConfig, 
-};
-use std::{
-  collections::HashMap, 
-  mem::{align_of, offset_of, size_of}
-};
+use std::{ collections::HashMap, mem::{align_of, offset_of, size_of} };
 use ash::{
   util::Align, vk::{
     self, Buffer, BufferCreateInfo, BufferUsageFlags, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, DeviceMemory, DeviceSize, Extent2D, Format, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PhysicalDevice, PhysicalDeviceMemoryProperties, Pipeline, PipelineLayout, PipelineLayoutCreateInfo, ShaderStageFlags, SharingMode, VertexInputAttributeDescription, VertexInputBindingDescription, VertexInputRate
   }, Device, Instance
 };
+
+use super::pipeline::{ GraphicsPipeline, PipelineConfig };
 
 #[repr(C, align(4))]
 #[derive(Copy)]

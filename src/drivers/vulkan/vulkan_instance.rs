@@ -1,24 +1,14 @@
-use crate::pipeline::PipelineConfig;
-use crate::vulkan_resources::{Vertex, VulkanResources};
 use std::ffi::CString;
 use std::os::raw::c_char;
 use winit::window::Window;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
-use ash::vk::{
-  Buffer, ClearColorValue, ClearValue, CommandBuffer, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandBufferLevel, CommandBufferUsageFlags, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, Fence, FenceCreateFlags, FenceCreateInfo, Framebuffer, FramebufferCreateInfo, Offset2D, PhysicalDeviceMemoryProperties, PipelineBindPoint, PipelineLayout, PresentModeKHR, Rect2D, RenderPass, RenderPassBeginInfo, Semaphore, SemaphoreCreateInfo, SubpassContents, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR
-};
-use ash::{
-  vk, 
-  vk::QueueFlags, 
-  vk::SurfaceKHR,
-  Entry, 
-  extensions::khr::Surface,
-};
-use raw_window_handle::{
-  HasRawWindowHandle, 
-  HasRawDisplayHandle,
-};
+use ash::vk::{ Buffer, ClearColorValue, ClearValue, CommandBuffer, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandBufferLevel, CommandBufferUsageFlags, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, Fence, FenceCreateFlags, FenceCreateInfo, Framebuffer, FramebufferCreateInfo, Offset2D, PhysicalDeviceMemoryProperties, PipelineBindPoint, PipelineLayout, PresentModeKHR, Rect2D, RenderPass, RenderPassBeginInfo, Semaphore, SemaphoreCreateInfo, SubpassContents, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR };
+use ash::{ vk, vk::QueueFlags, vk::SurfaceKHR,Entry, extensions::khr::Surface };
+use raw_window_handle::{ HasRawWindowHandle, HasRawDisplayHandle };
+
+use super::pipeline::PipelineConfig;
+use super::vulkan_resources::{Vertex, VulkanResources};
 
 pub struct VulkanInstance {
   _entry: Entry,

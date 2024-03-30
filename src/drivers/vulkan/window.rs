@@ -1,27 +1,18 @@
 use std::{cell::Cell, env};
-
-use vulkan_resources::Vertex;
-use vulkan::{VulkanInstance, MAX_FRAMES_IN_FLIGHT};
-use ash::vk::{
-  DescriptorSetLayoutBinding, DescriptorType, ShaderStageFlags 
+use ash::vk::{ DescriptorSetLayoutBinding, DescriptorType, ShaderStageFlags };
+use winit::{ 
+  window::WindowBuilder,
+  event::{ Event, WindowEvent}, 
+  event_loop::{ ControlFlow, EventLoop},
 };
-use pipeline::{
-  PipelineConfig, 
-  ShaderStageConfig,
-};
-use winit::{
-    event::{self, Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
-  };
-  
-  mod vulkan;
-  mod vulkan_resources;
-  mod pipeline;
 
-  fn main() {
+use super::vulkan::vulkan_resources::Vertex;
+use super::vulkan::vulkan_instance::{ VulkanInstance, MAX_FRAMES_IN_FLIGHT};
+use super::vulkan::pipeline::{ PipelineConfig, ShaderStageConfig };
 
-    let application_name = "Real Engine";
+  fn run() {
+
+    let application_name = "Vulkan Testing";
     let event_loop = EventLoop::new().unwrap();
     let _window = WindowBuilder::new()
       .with_title(application_name)
@@ -125,15 +116,17 @@ use winit::{
           };
           
           if let Some(fence) = vulkan_instance.get_image_in_flight(image_index as usize) {
-            vulkan_instance
+            //vulkan_instance
           }
 
           current_frame.set((frame_index + 1) & MAX_FRAMES_IN_FLIGHT)
         },
         
+        /*
         Event::MainEventsCleard => {
           _window.request_redraw();
         },
+        */
         _ => (),
       }
     });

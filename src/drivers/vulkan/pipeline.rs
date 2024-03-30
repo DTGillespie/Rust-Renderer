@@ -6,7 +6,7 @@ use ash::{
   Device
 };
 
-use crate::vulkan_resources::Vertex;
+use super::vulkan_resources::Vertex;
 
 pub struct ShaderStageConfig {
   pub stage       : ShaderStageFlags,
