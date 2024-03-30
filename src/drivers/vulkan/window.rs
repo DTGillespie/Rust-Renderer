@@ -6,9 +6,9 @@ use winit::{
   event_loop::{ ControlFlow, EventLoop},
 };
 
-use super::vulkan::vulkan_resources::Vertex;
-use super::vulkan::vulkan_instance::{ VulkanInstance, MAX_FRAMES_IN_FLIGHT};
-use super::vulkan::pipeline::{ PipelineConfig, ShaderStageConfig };
+use super::vulkan_resources::Vertex;
+use super::vulkan_instance::{ VulkanInstance, MAX_FRAMES_IN_FLIGHT};
+use super::pipeline::{ PipelineConfig, ShaderStageConfig };
 
   fn run() {
 
