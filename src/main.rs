@@ -1,18 +1,16 @@
-use std::env;
+use std::{cell::Cell, env};
 
 use vulkan_resources::Vertex;
-use vulkan::VulkanInstance;
+use vulkan::{VulkanInstance, MAX_FRAMES_IN_FLIGHT};
 use ash::vk::{
-  DescriptorSetLayoutBinding, 
-  DescriptorType, 
-  ShaderStageFlags, 
+  DescriptorSetLayoutBinding, DescriptorType, ShaderStageFlags 
 };
 use pipeline::{
   PipelineConfig, 
   ShaderStageConfig,
 };
 use winit::{
-    event::{Event, WindowEvent},
+    event::{self, Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
   };
@@ -44,7 +42,7 @@ use winit::{
         .allocate_resources(10)
         .create_command_pool()
         .allocate_command_buffers()
-        .create_semaphores();
+        .create_synchronization_objects();
 
       // Test Shader
       let cwd = env::current_dir().expect("Failed to get current working directory");
@@ -97,65 +95,46 @@ use winit::{
       vulkan_instance.allocate_vertex_buffer(&vertices);
     }
 
-    let _ = event_loop.run(move |event, elwt| {
-      let mut _control_flow = ControlFlow::Wait;
+    /* Render Loop */
+    let current_frame = Cell::new(0);
+
+    //event_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |event, control_flow| {
+      //*control_flow = ControlFlow::Poll;
 
       match event {
-        Event::WindowEvent { event, .. } => match event {
-          
-          WindowEvent::CloseRequested => elwt.exit(),
-          
-          WindowEvent::Resized(_) => {
-            _window.request_redraw();
-          },
 
-          WindowEvent::RedrawRequested => {
-            match vulkan_instance.acquire_next_image_index() {
+        Event::WindowEvent {
+          event: WindowEvent::CloseRequested,
+          ..
+        } => return,
 
-              Ok(image_index) => {
-                vulkan_instance.record_command_buffer("PRIMARY", image_index as usize);
-              },
+        /* Main Draw Loop */
+        Event::WindowEvent {
+          event: WindowEvent::RedrawRequested,
+          ..
+        } => {
 
-              Err(e) => {
-                eprintln!("Failed to acquire next image index: {:?}", e);
-                panic!("Fatal error, closing application");
-              }
+          let frame_index = current_frame.get();
+          let image_index = match vulkan_instance.acquire_next_image_index(frame_index) {
+            Ok(index) => index,
+            Err(_) => {
+              println!("Failed to acquire next Image Index");
+              return;
             }
+          };
+           /* STOPPED HERE. Working with example from GPT down at bottom */
+          if let Some(fence) = vulkan_instance.get_image_in_flight(image_index as usize) {
+            vulkan_instance.logicical
           }
-          _ => (),
-        },
 
-        Event::NewEvents(_) => {
-
-        },
-
-        Event::DeviceEvent { device_id, event } => {
-
+          current_frame.set((frame_index + 1) & MAX_FRAMES_IN_FLIGHT)
         },
         
-        Event::UserEvent(_) => {
-
+        Event::MainEventsCleard => {
+          _window.request_redraw();
         },
-        
-        Event::Suspended => {
-          
-        },
-        
-        Event::Resumed => {
-
-        },
-        
-        Event::AboutToWait => {
-
-        },
-        
-        Event::LoopExiting => {
-
-        },
-        
-        Event::MemoryWarning => {
-
-        },
+        _ => (),
       }
     });
   }

@@ -6,7 +6,7 @@ use winit::window::Window;
 use ash::extensions::khr::Swapchain;
 use ash::prelude::VkResult;
 use ash::vk::{
-  Buffer, ClearColorValue, ClearValue, CommandBuffer, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandBufferLevel, CommandBufferUsageFlags, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, Fence, Framebuffer, FramebufferCreateInfo, Offset2D, PhysicalDeviceMemoryProperties, PipelineBindPoint, PipelineLayout, PresentModeKHR, Rect2D, RenderPass, RenderPassBeginInfo, Semaphore, SemaphoreCreateInfo, SubpassContents, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR
+  Buffer, ClearColorValue, ClearValue, CommandBuffer, CommandBufferAllocateInfo, CommandBufferBeginInfo, CommandBufferLevel, CommandBufferUsageFlags, CommandPool, CommandPoolCreateFlags, CommandPoolCreateInfo, DescriptorSetLayoutBinding, DeviceMemory, DeviceSize, Extent2D, Fence, FenceCreateFlags, FenceCreateInfo, Framebuffer, FramebufferCreateInfo, Offset2D, PhysicalDeviceMemoryProperties, PipelineBindPoint, PipelineLayout, PresentModeKHR, Rect2D, RenderPass, RenderPassBeginInfo, Semaphore, SemaphoreCreateInfo, SubpassContents, SurfaceCapabilitiesKHR, SurfaceFormatKHR, SwapchainKHR
 };
 use ash::{
   vk, 
@@ -47,9 +47,13 @@ pub struct VulkanInstance {
   vertex_buffer_memory            : Option<DeviceMemory>, // Need to move to vulkan_resources
   command_pool                    : Option<CommandPool>,
   command_buffers                 : Option<Vec<CommandBuffer>>,
-  image_available_semaphore       : Option<Semaphore>,
-  render_finished_semaphore       : Option<Semaphore>,
+  image_available_semaphores      : Vec<Semaphore>,
+  render_complete_semaphores      : Vec<Semaphore>,
+  in_flight_fences                : Vec<Fence>,
+  images_in_flight                : Vec<Option<Fence>>,
 }
+
+pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 impl VulkanInstance {
   
@@ -105,9 +109,11 @@ impl VulkanInstance {
       vertex_buffer_memory            : None,
       command_pool                    : None,
       command_buffers                 : None,
-      image_available_semaphore       : None,
-      render_finished_semaphore       : None,
-      vertex_count                    : 0
+      image_available_semaphores      : Vec::new(),
+      render_complete_semaphores      : Vec::new(),
+      vertex_count                    : 0,
+      in_flight_fences                : Vec::new(),
+      images_in_flight                : Vec::new(), 
     })
   }
 
@@ -581,17 +587,34 @@ impl VulkanInstance {
     self
   }
 
-  pub fn create_semaphores(&mut self) {
+  pub fn create_synchronization_objects(&mut self) {
+    
+    self.image_available_semaphores = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
+    self.render_complete_semaphores = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
+    self.in_flight_fences = Vec::with_capacity(MAX_FRAMES_IN_FLIGHT);
+
     let semaphore_info = SemaphoreCreateInfo::default();
+    let fence_info = FenceCreateInfo::builder()
+      .flags(FenceCreateFlags::SIGNALED)
+      .build();
 
-    self.image_available_semaphore = unsafe {
-      Some(self.logical_device.as_ref().unwrap().create_semaphore(&semaphore_info, None)
-        .expect("Failed to create Image Availability Semaphore"))
-    };
+    for _ in 0..MAX_FRAMES_IN_FLIGHT {
+      let image_available_semaphore = unsafe {
+        self.logical_device.as_ref().unwrap().create_semaphore(&semaphore_info, None)
+          .expect("Failed to create Image Availability Semaphore")
+      };
+      let render_complete_semaphore = unsafe {
+        self.logical_device.as_ref().unwrap().create_semaphore(&semaphore_info, None)
+          .expect("Failed to create Render Complete Semaphore")
+      };
+      let in_flight_fence = unsafe {
+        self.logical_device.as_ref().unwrap().create_fence(&fence_info, None)
+          .expect("Failed to create In-flight Fence")
+      };
 
-    self.render_finished_semaphore = unsafe {
-      Some(self.logical_device.as_ref().unwrap().create_semaphore(&semaphore_info, None)
-      .expect("Failed to create Render Fiished Semaphore"))
+      self.image_available_semaphores.push(image_available_semaphore);
+      self.render_complete_semaphores.push(render_complete_semaphore);
+      self.in_flight_fences.push(in_flight_fence);
     }
   }
 
@@ -650,14 +673,14 @@ impl VulkanInstance {
     self.vertex_buffer_memory = Some(vbo.1);
   }
 
-  pub fn acquire_next_image_index(&self) -> Result<u32, vk::Result> {
+  pub fn acquire_next_image_index(&self, semaphore_index: usize) -> Result<u32, vk::Result> {
     let timeout = u64::MAX;
-
+    let semaphore = self.image_available_semaphores[semaphore_index];
     let (image_index, _is_suboptimal) = unsafe {
       self.swapchain_loader.as_ref().unwrap().acquire_next_image(
         self.swapchain.unwrap(), 
         timeout, 
-        self.image_available_semaphore.unwrap(), 
+        semaphore, 
         Fence::null()
       )?
     };
@@ -715,6 +738,7 @@ impl VulkanInstance {
         );
 
         println!("Debug draw");
+        
         /* Draw */
         self.logical_device.as_ref().unwrap().cmd_draw(
           command_buffer, 
@@ -725,5 +749,9 @@ impl VulkanInstance {
         )
       }
     }
+  }
+
+  pub fn get_image_in_flight(&mut self, image_index: usize) -> Option<Fence> {
+    self.images_in_flight[image_index]
   }
 }
