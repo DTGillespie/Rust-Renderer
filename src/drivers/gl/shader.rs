@@ -2,7 +2,8 @@ use std::ffi::{CStr, CString};
 use std::str;
 
 use gl::types::GLenum;
-use gl::{AttachShader, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, LinkProgram, ShaderSource, UseProgram, FRAGMENT_SHADER, VERTEX_SHADER};
+use gl::{AttachShader, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, GetUniformLocation, LinkProgram, ShaderSource, UniformMatrix4fv, UseProgram, FRAGMENT_SHADER, VERTEX_SHADER};
+use nalgebra::Matrix4;
 
 pub struct Shader{
   id: u32
@@ -37,6 +38,13 @@ impl Shader {
     }
 
     Shader { id: program }
+  }
+
+  pub fn set_mat4(&self, name: &str, mat: &Matrix4<f32>) {
+    unsafe {
+      let loc = GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+      UniformMatrix4fv(loc, 1, gl::FALSE, mat.as_ptr())
+    }
   }
 
   pub fn use_program(&self) {

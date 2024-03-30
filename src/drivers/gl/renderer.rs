@@ -1,6 +1,7 @@
-use std::mem::size_of;
+use std::{mem::size_of, ptr};
 
-use gl::{types::{GLsizei, GLsizeiptr, GLvoid}, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, DrawArrays, EnableVertexAttribArray, GenBuffers, GenVertexArrays, VertexAttribPointer, ARRAY_BUFFER, STATIC_DRAW, TRIANGLES};
+use gl::{types::{GLsizei, GLsizeiptr, GLvoid}, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, DrawArrays, EnableVertexAttribArray, GenBuffers, GenVertexArrays, GetUniformLocation, VertexAttribPointer, ARRAY_BUFFER, STATIC_DRAW, TRIANGLES};
+use nalgebra::Matrix4;
 
 use super::shader::Shader;
 
@@ -26,7 +27,7 @@ impl Renderer {
         STATIC_DRAW
       );
 
-      VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * size_of::<f32>() as GLsizei, std::ptr::null());
+      VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 3 * size_of::<f32>() as GLsizei, ptr::null());
       EnableVertexAttribArray(0);
       BindBuffer(ARRAY_BUFFER, 0);
       BindVertexArray(0);
@@ -34,11 +35,37 @@ impl Renderer {
     Renderer { vao, vbo }
   }
 
-  pub fn render(&mut self, shader: &Shader) {
+  pub fn render(&mut self, shader: &Shader, vertex_count: usize, model: &Matrix4<f32>, view: &Matrix4<f32>, projection: &Matrix4<f32>) {
     unsafe {
+
       shader.use_program();
+      shader.set_mat4("model", model);
+      shader.set_mat4("view", view);
+      shader.set_mat4("projection", projection);
+
       BindVertexArray(self.vao);
-      DrawArrays(TRIANGLES, 0, 3);
+
+      unsafe {
+
+        // Position attribute
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * size_of::<f32>() as GLsizei, ptr::null());
+        gl::EnableVertexAttribArray(0);
+        
+        // Normal attribute
+        let normal_offset = 3 * size_of::<f32>() as GLsizei;
+        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 6 * size_of::<f32>() as GLsizei, normal_offset as *const _);
+        gl::EnableVertexAttribArray(1);
+      }
+
+      /*
+      shader.set_vec3("lightPos", &light_pos);
+      shader.set_vec3("viewPos", &camera_pos);
+      shader.set_vec3("lightColor", &light_color);
+      shader.set_vec3("objectColor", &object_color);
+      */
+
+      DrawArrays(TRIANGLES, 0, vertex_count as GLsizei);
+      BindVertexArray(0);
     }
   }
 }
