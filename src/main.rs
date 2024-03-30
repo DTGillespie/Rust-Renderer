@@ -123,9 +123,9 @@ use winit::{
               return;
             }
           };
-           /* STOPPED HERE. Working with example from GPT down at bottom */
+          
           if let Some(fence) = vulkan_instance.get_image_in_flight(image_index as usize) {
-            vulkan_instance.logicical
+            vulkan_instance
           }
 
           current_frame.set((frame_index + 1) & MAX_FRAMES_IN_FLIGHT)
@@ -138,3 +138,72 @@ use winit::{
       }
     });
   }
+
+  /*
+
+  event_loop.run(move |event, _, control_flow| {
+    *control_flow = ControlFlow::Poll; // Continuously run the event loop, even if no events are being received.
+
+    match event {
+        Event::WindowEvent {
+            event: WindowEvent::CloseRequested,
+            ..
+        } => *control_flow = ControlFlow::Exit, // Exit the loop when the window is closed.
+
+        Event::RedrawRequested(_) => { // This is triggered for every frame to be drawn.
+            let image_index = match vulkan_instance.acquire_next_image_index(&image_available_semaphores[current_frame]) {
+                Ok(index) => index,
+                Err(_) => {
+                    // Handle error (e.g., recreate swap chain if needed)
+                    return;
+                }
+            };
+
+            if let Some(fence) = images_in_flight[image_index as usize] {
+                vulkan_instance.logical_device.wait_for_fences(&[fence], true, u64::MAX).expect("Failed to wait for fence");
+            }
+            images_in_flight[image_index as usize] = Some(in_flight_fences[current_frame]);
+
+            // Assuming command_buffer recording and other Vulkan operations are correctly handled here
+
+            let wait_semaphores = [image_available_semaphores[current_frame]];
+            let signal_semaphores = [render_finished_semaphores[current_frame]];
+            let wait_stages = [PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+            let submit_info = vk::SubmitInfo::builder()
+                .wait_semaphores(&wait_semaphores)
+                .wait_dst_stage_mask(&wait_stages)
+                .command_buffers(&[command_buffer]) // Your command buffer for the current frame
+                .signal_semaphores(&signal_semaphores)
+                .build();
+
+            vulkan_instance.logical_device.reset_fences(&[in_flight_fences[current_frame]]).expect("Failed to reset fence");
+            vulkan_instance.graphics_queue.submit(&[submit_info], in_flight_fences[current_frame]).expect("Failed to submit draw command buffer");
+
+            let swapchains = [vulkan_instance.swapchain];
+            let image_indices = [image_index];
+            let present_info = vk::PresentInfoKHR::builder()
+                .wait_semaphores(&signal_semaphores)
+                .swapchains(&swapchains)
+                .image_indices(&image_indices)
+                .build();
+
+            match vulkan_instance.present_queue.present_khr(&present_info) {
+                Ok(_) => (),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) | Err(vk::Result::SUBOPTIMAL_KHR) => {
+                    // Handle swap chain recreation
+                },
+                Err(e) => panic!("Failed to present swapchain image: {:?}", e),
+            }
+
+            current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+        },
+
+        Event::MainEventsCleared => {
+            // Ensure the window is always requested to redraw, enabling continuous animation.
+            window.request_redraw();
+        }
+
+        _ => (),
+    }
+  });
+  */
