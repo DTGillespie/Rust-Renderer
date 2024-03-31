@@ -2,7 +2,8 @@ use std::ffi::{CStr, CString};
 use std::str;
 
 use gl::types::GLenum;
-use gl::{AttachShader, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, GetUniformLocation, LinkProgram, ShaderSource, UniformMatrix4fv, UseProgram, FRAGMENT_SHADER, VERTEX_SHADER};
+use gl::{ActiveTexture, AttachShader, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, GetUniformLocation, LinkProgram, ShaderSource, UniformMatrix4fv, UseProgram, FRAGMENT_SHADER, VERTEX_SHADER};
+use image::RgbaImage;
 use nalgebra::Matrix4;
 
 pub struct Shader{
@@ -11,7 +12,7 @@ pub struct Shader{
 
 impl Shader {
   
-  pub fn from_source(vertex_source: &str, fragment_source: &str) -> Shader {
+  pub fn from_source(vertex_source: &str, fragment_source: &str, ) -> Shader {
 
     let compile_shader = |src: &str, ty: GLenum| -> u32 {
       let shader;
@@ -32,7 +33,6 @@ impl Shader {
       AttachShader(program, vertex_shader);
       AttachShader(program, fragment_shader);
       LinkProgram(program);
-
       DeleteShader(vertex_shader);
       DeleteShader(fragment_shader);
     }

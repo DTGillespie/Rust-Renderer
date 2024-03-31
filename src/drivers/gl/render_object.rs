@@ -1,5 +1,4 @@
 use std::{mem::size_of, ptr};
-
 use gl::{types::{GLsizei, GLsizeiptr, GLvoid}, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, DrawArrays, DrawElements, EnableVertexAttribArray, GenBuffers, GenVertexArrays, GetUniformLocation, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, STATIC_DRAW, TRIANGLES, UNSIGNED_INT};
 use nalgebra::Matrix4;
 
@@ -21,7 +20,7 @@ impl RenderObject {
     model       : &Matrix4<f32>, 
     view        : &Matrix4<f32>, 
     projection  : &Matrix4<f32>
-  ) { self.render_context.render(shader, index_count, model, view, projection) }
+  ) { self.render_context.draw(shader, index_count, model, view, projection) }
 }
 
 struct RenderContext {
@@ -70,7 +69,7 @@ impl RenderContext {
     RenderContext { vao, vbo, ebo}
   }
 
-  pub fn render(&mut self, shader: &Shader, index_count: usize, model: &Matrix4<f32>, view: &Matrix4<f32>, projection: &Matrix4<f32>) {
+  pub fn draw(&mut self, shader: &Shader, index_count: usize, model: &Matrix4<f32>, view: &Matrix4<f32>, projection: &Matrix4<f32>) {
     unsafe {
 
       shader.use_program();
@@ -83,21 +82,16 @@ impl RenderContext {
       unsafe {
 
         // Position attribute
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 6 * size_of::<f32>() as GLsizei, ptr::null());
-        gl::EnableVertexAttribArray(0);
-        
-        // Normal attribute
-        let normal_offset = 3 * size_of::<f32>() as GLsizei;
-        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 6 * size_of::<f32>() as GLsizei, normal_offset as *const _);
-        gl::EnableVertexAttribArray(1);
-      }
+        //let stride = (6 * size_of::<f32>()) as GLsizei;
+        let stride = (5 * size_of::<f32>()) as GLsizei;
+        VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, 0 as *const _);
+        EnableVertexAttribArray(0);
 
-      /*
-      shader.set_vec3("lightPos", &light_pos);
-      shader.set_vec3("viewPos", &camera_pos);
-      shader.set_vec3("lightColor", &light_color);
-      shader.set_vec3("objectColor", &object_color);
-      */
+        // Texture Coordinate Attribute
+        VertexAttribPointer(1, 2, gl::FLOAT, gl::FALSE, stride, (3 * size_of::<f32>()) as *const _);
+        EnableVertexAttribArray(1);
+
+      }
 
       DrawElements(
         TRIANGLES,

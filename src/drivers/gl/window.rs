@@ -1,11 +1,13 @@
 extern crate gl;
 extern crate glfw;
 
+use std::{env, path::{Path, PathBuf}};
+
 use gl::{Clear, ClearColor, COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT, DEPTH_TEST};
 use glfw::{fail_on_errors, Action, Context, Key};
 use nalgebra::{Matrix4, Perspective3, Point3, Vector3};
 
-use super::{ render_object::RenderObject, shader::Shader, viewport::Viewport};
+use super::{ render_object::RenderObject, shader::Shader, utils::load_image, viewport::Viewport};
 
 pub fn run() {
 
@@ -25,16 +27,16 @@ pub fn run() {
   }
 
   // Cube
-  let vertices: [f32; 24] = [
-    // Position         // Description
-    -1.0, -1.0, -1.0, // Back-bottom-left 0
-     1.0, -1.0, -1.0, // Back-bottom-right 1
-     1.0,  1.0, -1.0, // Back-top-right 2
-    -1.0,  1.0, -1.0, // Back-top-left 3
-    -1.0, -1.0,  1.0, // Front-bottom-left 4
-     1.0, -1.0,  1.0, // Front-bottom-right 5
-     1.0,  1.0,  1.0, // Front-top-right 6
-    -1.0,  1.0,  1.0, // Front-top-left 7
+  let vertices: [f32; 24] = [ // Don't think these texture cordinates are implemented yet, so the model is messed up
+    // Position       // Texture Coords   // Description
+    -1.0, -1.0, -1.0, //0.0, 0.0,           // Back-bottom-left   0
+     1.0, -1.0, -1.0, //1.0, 0.0,           // Back-bottom-right  1
+     1.0,  1.0, -1.0, //1.0, 1.0,           // Back-top-right     2
+    -1.0,  1.0, -1.0, //0.0, 1.0,           // Back-top-left      3
+    -1.0, -1.0,  1.0, //0.0, 0.0,           // Front-bottom-left  4
+     1.0, -1.0,  1.0, //1.0, 0.0,           // Front-bottom-right 5
+     1.0,  1.0,  1.0, //1.0, 1.0,           // Front-top-right    6
+    -1.0,  1.0,  1.0, //0.0, 1.0,           // Front-top-left     7
 ];
 
 let indices: [u32; 36] = [
@@ -74,6 +76,15 @@ let indices: [u32; 36] = [
     }
   "#;
 
+  let cwd = env::current_dir().expect("Failed to get current working directory");
+  let root_dir = cwd.parent()
+                                 .and_then(Path::parent)
+                                 .map(PathBuf::from)
+                                 .expect("Failed to navigate working directory");
+  let texture_path = root_dir.join("assets/test_texture.jpg");
+  let texture_path_str = texture_path.to_str().expect("Path contains invalid unicode");
+  let texture = load_image(texture_path_str).expect("Failed to load texture");
+
   let shader = Shader::from_source(vertex_source, fragment_source);
   let mut cube = RenderObject::new(&vertices, &indices);
 
@@ -83,7 +94,7 @@ let indices: [u32; 36] = [
     Vector3::y()
   );
 
-  let aspect_ratio = 800.0 / 600.0;
+  let aspect_ratio = 1600.0 / 1200.0;
   let projection = Perspective3::new(
     aspect_ratio, 
     nalgebra::convert(45.0f32.to_radians()), 
@@ -112,6 +123,7 @@ let indices: [u32; 36] = [
     angle += 0.0001;
     let rotation_matrix = Matrix4::<f32>::from_axis_angle(&Vector3::y_axis(), nalgebra::convert(angle));
     let view = viewport.get_view_matrix();
+
     //let model = Matrix4::<f32>::identity();
     let model = rotation_matrix;
 
