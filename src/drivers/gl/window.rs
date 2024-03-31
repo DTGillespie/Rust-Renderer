@@ -5,7 +5,7 @@ use gl::{Clear, ClearColor, COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT, DEPTH_TEST};
 use glfw::{fail_on_errors, Action, Context, Key};
 use nalgebra::{Matrix4, Perspective3, Point3, Vector3};
 
-use super::{renderer::Renderer, shader::Shader, viewport::Viewport};
+use super::{ render_object::RenderObject, shader::Shader, viewport::Viewport};
 
 pub fn run() {
 
@@ -24,73 +24,44 @@ pub fn run() {
     gl::Enable(DEPTH_TEST);
   }
 
-  let vertices: [f32; 216] = [
-    // Front face
-    -1.0, -1.0, 1.0, 0.0, 0.0, 1.0, // Bottom-left
-     1.0, -1.0, 1.0, 0.0, 0.0, 1.0, // Bottom-right
-     1.0,  1.0, 1.0, 0.0, 0.0, 1.0, // Top-right
-     1.0,  1.0, 1.0, 0.0, 0.0, 1.0, // Top-right
-    -1.0,  1.0, 1.0, 0.0, 0.0, 1.0, // Top-left
-    -1.0, -1.0, 1.0, 0.0, 0.0, 1.0, // Bottom-left
+  // Cube
+  let vertices: [f32; 24] = [
+    // Position         // Description
+    -1.0, -1.0, -1.0, // Back-bottom-left 0
+     1.0, -1.0, -1.0, // Back-bottom-right 1
+     1.0,  1.0, -1.0, // Back-top-right 2
+    -1.0,  1.0, -1.0, // Back-top-left 3
+    -1.0, -1.0,  1.0, // Front-bottom-left 4
+     1.0, -1.0,  1.0, // Front-bottom-right 5
+     1.0,  1.0,  1.0, // Front-top-right 6
+    -1.0,  1.0,  1.0, // Front-top-left 7
+];
 
-    // Right face
-     1.0, -1.0,  1.0, 0.0, 0.0, 1.0,  // Bottom-left
-     1.0, -1.0, -1.0, 0.0, 0.0, 1.0,  // Bottom-right
-     1.0,  1.0, -1.0, 0.0, 0.0, 1.0,  // Top-right
-     1.0,  1.0, -1.0, 0.0, 0.0, 1.0,  // Top-right
-     1.0,  1.0,  1.0, 0.0, 0.0, 1.0,  // Top-left
-     1.0, -1.0,  1.0, 0.0, 0.0, 1.0,  // Bottom-left
-
+let indices: [u32; 36] = [
     // Back face
-     1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-left
-    -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-right
-    -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Top-right
-    -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Top-right
-     1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Top-left
-     1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-left
-
+    0, 1, 2, 2, 3, 0,
+    // Right face
+    1, 5, 6, 6, 2, 1,
+    // Front face
+    5, 4, 7, 7, 6, 5,
     // Left face
-    -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-left
-    -1.0, -1.0,  1.0, 0.0, 0.0, 1.0, // Bottom-right
-    -1.0,  1.0,  1.0, 0.0, 0.0, 1.0, // Top-right
-    -1.0,  1.0,  1.0, 0.0, 0.0, 1.0, // Top-right
-    -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Top-left
-    -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-left
-
+    4, 0, 3, 3, 7, 4,
     // Bottom face
-    -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Top-right
-     1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Top-left
-     1.0, -1.0,  1.0, 0.0, 0.0, 1.0, // Bottom-left
-     1.0, -1.0,  1.0, 0.0, 0.0, 1.0, // Bottom-left
-    -1.0, -1.0,  1.0, 0.0, 0.0, 1.0, // Bottom-right
-    -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, // Top-right
-
+    4, 5, 1, 1, 0, 4,
     // Top face
-    -1.0,  1.0,  1.0, 0.0, 0.0, 1.0, // Top-left
-     1.0,  1.0,  1.0, 0.0, 0.0, 1.0, // Top-right
-     1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-right
-     1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-right
-    -1.0,  1.0, -1.0, 0.0, 0.0, 1.0, // Bottom-left
-    -1.0,  1.0,  1.0, 0.0, 0.0, 1.0, // Top-left
+    3, 2, 6, 6, 7, 3,
 ];
 
   let vertex_source = r#"
     #version 330 core
     layout (location = 0) in vec3 aPos;
-    layout (location = 1) in vec3 aNormal;
-
-    out vec3 Normal;
-    out vec3 FragPos;
 
     uniform mat4 model;
     uniform mat4 view;
     uniform mat4 projection;
 
     void main() {
-        FragPos = vec3(model * vec4(aPos, 1.0));
-        Normal = mat3(transpose(inverse(model))) * aNormal;
-
-        gl_Position = projection * view * vec4(FragPos, 1.0);
+      gl_Position = projection * view * model * vec4(aPos, 1.0);
     }
   "#;
 
@@ -98,33 +69,13 @@ pub fn run() {
     #version 330 core
     out vec4 FragColor;
 
-    in vec3 Normal;
-    in vec3 FragPos;
-
-    uniform vec3 lightPos; // Position of the light source
-    uniform vec3 viewPos;  // Position of the camera
-    uniform vec3 lightColor;
-    uniform vec3 objectColor;
-
     void main() {
-
-        // Ambient lighting
-        float ambientStrength = 0.1;
-        vec3 ambient = ambientStrength * lightColor;
-
-        // Diffuse lighting
-        vec3 norm = normalize(Normal);
-        vec3 lightDir = normalize(lightPos - FragPos);
-        float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse = diff * lightColor;
-
-        vec3 result = (ambient + diffuse) * objectColor;
-        FragColor = vec4(result, 1.0);
+      FragColor = vec4(1.0, 0.5, 0.2, 1.0); // orange color
     }
   "#;
 
   let shader = Shader::from_source(vertex_source, fragment_source);
-  let mut renderer = Renderer::new(&vertices);
+  let mut cube = RenderObject::new(&vertices, &indices);
 
   let viewport = Viewport::new(
     Point3::new(0.0, 0.0, 3.0),
@@ -164,7 +115,7 @@ pub fn run() {
     //let model = Matrix4::<f32>::identity();
     let model = rotation_matrix;
 
-    renderer.render(&shader, vertices.len(), &model, &view, &projection);
+    cube.render(&shader, vertices.len(), &model, &view, &projection);
 
     window.swap_buffers();
     process_input(&mut window);
