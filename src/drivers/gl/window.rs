@@ -81,12 +81,16 @@ let indices: [u32; 36] = [
                                  .and_then(Path::parent)
                                  .map(PathBuf::from)
                                  .expect("Failed to navigate working directory");
+                                
   let texture_path = root_dir.join("assets/test_texture.jpg");
   let texture_path_str = texture_path.to_str().expect("Path contains invalid unicode");
-  let texture = load_image(texture_path_str).expect("Failed to load texture");
-
-  let shader = Shader::from_source(vertex_source, fragment_source);
-  let mut cube = RenderObject::new(&vertices, &indices);
+  
+  let mut cube = RenderObject::new(
+    vertices.to_vec(), 
+    indices.to_vec(),
+    Shader::from_source(vertex_source, fragment_source),
+    Some(load_image(texture_path_str).expect("Failed to load texture")),
+  );
 
   let viewport = Viewport::new(
     Point3::new(0.0, 0.0, 3.0),
@@ -127,7 +131,7 @@ let indices: [u32; 36] = [
     //let model = Matrix4::<f32>::identity();
     let model = rotation_matrix;
 
-    cube.render(&shader, vertices.len(), &model, &view, &projection);
+    cube.draw(&model, &view, &projection);
 
     window.swap_buffers();
     process_input(&mut window);

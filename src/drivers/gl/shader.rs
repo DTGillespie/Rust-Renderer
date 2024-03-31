@@ -1,8 +1,9 @@
 use std::ffi::{CStr, CString};
-use std::str;
+use std::mem::size_of;
+use std::{ptr, str};
 
-use gl::types::GLenum;
-use gl::{ActiveTexture, AttachShader, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, GetUniformLocation, LinkProgram, ShaderSource, UniformMatrix4fv, UseProgram, FRAGMENT_SHADER, VERTEX_SHADER};
+use gl::types::{GLenum, GLsizei};
+use gl::{ActiveTexture, AttachShader, BindVertexArray, CompileShader, CreateProgram, CreateShader, DeleteProgram, DeleteShader, DrawElements, EnableVertexAttribArray, GetUniformLocation, LinkProgram, ShaderSource, UniformMatrix4fv, UseProgram, VertexAttribPointer, FRAGMENT_SHADER, TRIANGLES, UNSIGNED_INT, VERTEX_SHADER};
 use image::RgbaImage;
 use nalgebra::Matrix4;
 
@@ -50,6 +51,32 @@ impl Shader {
   pub fn use_program(&self) {
     unsafe {
       UseProgram(self.id);
+    }
+  }
+
+  pub fn render(& self, vao: u32, index_count: i32) {
+    unsafe {
+
+      BindVertexArray(vao);
+
+      // Position attribute
+      //let stride = (6 * size_of::<f32>()) as GLsizei;
+      let stride = (5 * size_of::<f32>()) as GLsizei;
+      VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, 0 as *const _);
+      EnableVertexAttribArray(0);
+
+      // Texture Coordinate Attribute
+      VertexAttribPointer(1, 2, gl::FLOAT, gl::FALSE, stride, (3 * size_of::<f32>()) as *const _);
+      EnableVertexAttribArray(1);
+
+      DrawElements(
+        TRIANGLES,
+        index_count as i32,
+        UNSIGNED_INT,
+        ptr::null()
+      );
+
+      BindVertexArray(0);
     }
   }
 }

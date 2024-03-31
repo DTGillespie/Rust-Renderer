@@ -1,37 +1,40 @@
 use std::{mem::size_of, ptr};
-use gl::{types::{GLsizei, GLsizeiptr, GLvoid}, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, DrawArrays, DrawElements, EnableVertexAttribArray, GenBuffers, GenVertexArrays, GetUniformLocation, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, STATIC_DRAW, TRIANGLES, UNSIGNED_INT};
+use gl::{types::{GLsizei, GLsizeiptr, GLvoid}, BindBuffer, BindVertexArray, BufferData, DeleteBuffers, DeleteVertexArrays, EnableVertexAttribArray, GenBuffers, GenVertexArrays, VertexAttribPointer, ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, STATIC_DRAW };
+use image::RgbaImage;
 use nalgebra::Matrix4;
 
 use super::shader::Shader;
 
 pub struct RenderObject {
-  render_context: RenderContext
+  render_context : RenderContext,
 }
 
 impl RenderObject {
-  pub fn new(vertices: &[f32], indices: &[u32]) -> Self {
-    RenderObject { render_context: RenderContext::new(vertices, indices) }
+  pub fn new(vertices: Vec<f32>, indices: Vec<u32>, shader: Shader, texture: Option<RgbaImage>) -> Self {
+    let index_count = vertices.len() as i32;
+    RenderObject { 
+      render_context : RenderContext::new(vertices, indices, shader, index_count, texture),
+    }
   }
 
-  pub fn render(
-    &mut self, 
-    shader      : &Shader, 
-    index_count : usize, 
-    model       : &Matrix4<f32>, 
-    view        : &Matrix4<f32>, 
-    projection  : &Matrix4<f32>
-  ) { self.render_context.draw(shader, index_count, model, view, projection) }
+  pub fn draw(
+    &mut self, model: &Matrix4<f32>, view: &Matrix4<f32>, projection  : &Matrix4<f32>) { 
+      self.render_context.draw(model, view, projection) 
+    }
 }
 
 struct RenderContext {
-  vao: u32,
-  vbo: u32,
-  ebo: u32,
+  shader      : Shader,
+  texture     : Option<RgbaImage>, 
+  index_count : i32,
+  vao         : u32,
+  vbo         : u32,
+  ebo         : u32,
 }
 
 impl RenderContext {
 
-  fn new(vertices: &[f32], indices: &[u32]) -> Self {
+  fn new(vertices: Vec<f32>, indices: Vec<u32>, shader: Shader, index_count: i32, texture: Option<RgbaImage>) -> Self {
     
     let (mut vao, mut vbo, mut ebo) = (0, 0, 0);
     unsafe {
@@ -66,41 +69,18 @@ impl RenderContext {
       BindBuffer(ARRAY_BUFFER, 0);
       BindVertexArray(0);
     }
-    RenderContext { vao, vbo, ebo}
+
+    RenderContext { vao, vbo, ebo, shader, index_count, texture }
   }
 
-  pub fn draw(&mut self, shader: &Shader, index_count: usize, model: &Matrix4<f32>, view: &Matrix4<f32>, projection: &Matrix4<f32>) {
+  pub fn draw(&mut self, model: &Matrix4<f32>, view: &Matrix4<f32>, projection: &Matrix4<f32>) {
     unsafe {
 
-      shader.use_program();
-      shader.set_mat4("model", model);
-      shader.set_mat4("view", view);
-      shader.set_mat4("projection", projection);
-
-      BindVertexArray(self.vao);
-
-      unsafe {
-
-        // Position attribute
-        //let stride = (6 * size_of::<f32>()) as GLsizei;
-        let stride = (5 * size_of::<f32>()) as GLsizei;
-        VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, 0 as *const _);
-        EnableVertexAttribArray(0);
-
-        // Texture Coordinate Attribute
-        VertexAttribPointer(1, 2, gl::FLOAT, gl::FALSE, stride, (3 * size_of::<f32>()) as *const _);
-        EnableVertexAttribArray(1);
-
-      }
-
-      DrawElements(
-        TRIANGLES,
-        index_count as i32,
-        UNSIGNED_INT,
-        ptr::null()
-      );
-
-      BindVertexArray(0);
+      self.shader.use_program();
+      self.shader.set_mat4("model", model);
+      self.shader.set_mat4("view", view);
+      self.shader.set_mat4("projection", projection);
+      self.shader.render(self.vao, self.index_count);
     }
   }
 }
