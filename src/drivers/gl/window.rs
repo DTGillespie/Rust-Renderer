@@ -7,7 +7,7 @@ use gl::{Clear, ClearColor, COLOR_BUFFER_BIT, DEPTH_BUFFER_BIT, DEPTH_TEST};
 use glfw::{fail_on_errors, Action, Context, Key};
 use nalgebra::{Matrix4, Perspective3, Point3, Vector3};
 
-use super::{ render_object::RenderObject, shader::Shader, utils::load_image, viewport::Viewport};
+use super::{ render_object::RenderObject, render_object::Shader, utils::{ load_image, load_obj }, viewport::Viewport};
 
 pub fn run() {
 
@@ -27,16 +27,17 @@ pub fn run() {
   }
 
   // Cube
-  let vertices: [f32; 24] = [ // Don't think these texture cordinates are implemented yet, so the model is messed up
+  /*
+  let vertices: [f32; 40] = [ // Don't think these texture cordinates are implemented yet, so the model is messed up
     // Position       // Texture Coords   // Description
-    -1.0, -1.0, -1.0, //0.0, 0.0,           // Back-bottom-left   0
-     1.0, -1.0, -1.0, //1.0, 0.0,           // Back-bottom-right  1
-     1.0,  1.0, -1.0, //1.0, 1.0,           // Back-top-right     2
-    -1.0,  1.0, -1.0, //0.0, 1.0,           // Back-top-left      3
-    -1.0, -1.0,  1.0, //0.0, 0.0,           // Front-bottom-left  4
-     1.0, -1.0,  1.0, //1.0, 0.0,           // Front-bottom-right 5
-     1.0,  1.0,  1.0, //1.0, 1.0,           // Front-top-right    6
-    -1.0,  1.0,  1.0, //0.0, 1.0,           // Front-top-left     7
+    -1.0, -1.0, -1.0, 0.0, 0.0,           // Back-bottom-left   0
+     1.0, -1.0, -1.0, 1.0, 0.0,           // Back-bottom-right  1
+     1.0,  1.0, -1.0, 1.0, 1.0,           // Back-top-right     2
+    -1.0,  1.0, -1.0, 0.0, 1.0,           // Back-top-left      3
+    -1.0, -1.0,  1.0, 0.0, 0.0,           // Front-bottom-left  4
+     1.0, -1.0,  1.0, 1.0, 0.0,           // Front-bottom-right 5
+     1.0,  1.0,  1.0, 1.0, 1.0,           // Front-top-right    6
+    -1.0,  1.0,  1.0, 0.0, 1.0,           // Front-top-left     7
 ];
 
 let indices: [u32; 36] = [
@@ -53,26 +54,35 @@ let indices: [u32; 36] = [
     // Top face
     3, 2, 6, 6, 7, 3,
 ];
+*/
 
   let vertex_source = r#"
     #version 330 core
     layout (location = 0) in vec3 aPos;
+    layout (location = 1) in vec2 aTexCoord;
+
+    out vec2 TexCoord;
 
     uniform mat4 model;
     uniform mat4 view;
     uniform mat4 projection;
 
     void main() {
-      gl_Position = projection * view * model * vec4(aPos, 1.0);
+        gl_Position = projection * view * model * vec4(aPos, 1.0);
+        TexCoord = aTexCoord;
     }
   "#;
 
   let fragment_source = r#"
     #version 330 core
     out vec4 FragColor;
-
+    
+    in vec2 TexCoord;
+    
+    uniform sampler2D texture1;
+    
     void main() {
-      FragColor = vec4(1.0, 0.5, 0.2, 1.0); // orange color
+      FragColor = texture(texture1, TexCoord);
     }
   "#;
 
@@ -81,9 +91,26 @@ let indices: [u32; 36] = [
                                  .and_then(Path::parent)
                                  .map(PathBuf::from)
                                  .expect("Failed to navigate working directory");
-                                
+
   let texture_path = root_dir.join("assets/test_texture.jpg");
   let texture_path_str = texture_path.to_str().expect("Path contains invalid unicode");
+  
+  let cube_model_path = root_dir.join("assets/cube.obj");
+  let (vertices, indices) = load_obj(cube_model_path)
+        .unwrap_or_else(|err| {
+            eprintln!("Error loading .obj file: {:?}", err);
+            (vec![], vec![]) // Provide default empty vectors if loading fails
+        });
+
+  println!("Vertices:");
+  for chunk in vertices.chunks(5) {
+    println!("Position: ({}, {}, {}), Texture Coords: ({}, {})", chunk[0], chunk[1], chunk[2], chunk[3], chunk[4]);
+  }
+
+  println!("Indices:");
+  for triangle in indices.chunks(3) {
+    println!("Triangle: {}, {}, {}", triangle[0], triangle[1], triangle[2]);
+  }
   
   let mut cube = RenderObject::new(
     vertices.to_vec(), 
